@@ -1,0 +1,2046 @@
+---
+title: "Module 4: Nova"
+subtitle: "OS220: OpenStack Compute Service"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "OS220 - OpenStack Administration"
+    width: 1280
+    height: 720
+    margin: 0.1
+    transition: slide
+    background-transition: fade
+  pptx:
+    reference-doc: ./template.pptx
+    highlight-style: tango
+    slide-level: 2
+footer: © Mirantis Training - OS220 - OpenStack Administration"
+
+---
+
+# Openstack Nova {.center}
+
+# (Compute Service) {.center}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 258 diagram](images/slide_258_image_01.png){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 258 diagram](images/slide_258_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+This next module will cover Nova. The OpenStack Compute service Nova is the OpenStack component to provision (that is deploy) and manage virtual machine instances.
+Nova works with several other OpenStack components. It uses Glance for images, Cinder to optionally attach volumes to the deployed virtual machines at boot time, and Neutron for networking (that is allocating IP addresses, network/subnet allocation, routing, and so on).
+Virtual machines are deployed to the hypervisor. Nova is the OpenStack component that interacts with the hypervisor. The nova‐compute process on the Compute Node handles all interaction with the hypervisor.
+You must have a unique Compute Node for each type of hypervisor (KVM/QEMU, QEMU, VMware, Xen, and so on).
+This module focuses on Nova as it relates to the Ussuri release of OpenStack.
+:::
+
+
+At the end of this presentation, you should be able to:
+Explain the role of each Nova process
+  - nova-api
+  - nova-scheduler
+  - nova-conductor
+  - nova-compute
+Describe the KVM hypervisor architecture List other supported hypervisors
+Describe quotas: how to set them & how they can affect you Use the CLI and UI to deploy instances
+
+Objectives
+
+259
+
+::: {.notes}
+- By the end of this presentation, you should be able to explain the role of each Nova process, that is nova-api, nova-scheduler, nova-conductor, and nova-compute.
+- You will also be able to describe the KVM hypervisor architecture and list other supported hypervisors.
+- You will be able to describe quotas including how to set them and how they can affect you.
+- Finally, you’ll learn how to use the CLI and UI to deploy instances.
+:::
+
+
+## Deploy an instance - Review
+
+Request for instance & token
+
+Is the request valid?
+Retrieve Service Catalog
+
+Is the image valid?
+
+Is the token valid?
+
+Is the network valid?
+
+Is this a valid user and can they deploy an instance?
+
+
+::: {.notes}
+Step 1 – User logs into the dashboard (aka Horizon) using username & password and issues a request for an instance
+Step 2 – Horizon sends username to Keystone to authenticate, is the user valid, and authorize, i.e. does the user have permissions to achieve the request.  If both conditions are met, then a token is issued to attach to the request and that is passed back to Horizon.
+Step 3 – Horizon now passes the request for an instance and the token to Nova.
+Step 4 - Nova takes the token and sends it to keystone to make sure this is a valid request.  If so, then the Service Catalog is retrieved (service endpoints) and Nova then starts the process of instatiating the instance
+Step 5 – Nova pulls the image information for the instance and the token and goes to GLANCE to ensure the image is valid
+Step 6 – Before Glance checks the validity of the requested image, it takes the token that was passed to it by Nova, sends it to Keystone to ensure this is a valid, untainted request.  If so, Glance then validates the image requested and lets Nova know it can proceed.
+Step 7 – Nova now passes token and network information to Neutron to see if the network information is valid or doable
+Step 8 – Neutron “talks” to Keystone to verify token.  IF token is valid, Neutron then validates the network request and gives Nova the “go ahead”
+:::
+
+
+# Nova Architecture {.center}
+
+PROCESS FLOW: DEPLOY A VM INSTANCE
+
+::: {.notes}
+This next section will cover process flow when deploying a VM instance.
+:::
+
+
+openstack server create
+  - --availability-zone <AZ_name_or_ID>
+--min <count>
+--max <count>
+--image <image_name_or_ID>
+--flavor <flavor_name_or_ID>
+--nic net-id=<network_name_or_ID>
+--network <network_name_or_ID>
+--port <port_name_or_ID>
+--security-group <secgrp_name_or_ID>
+--security-group <2nd_secgrp_name_or_ID>
+--key-name <SSH_key_name_or_ID>
+--user-data  <file_for_user-init>
+instance_name
+
+Deploying an instance via CLI
+
+262
+
+#default: nova, if only 1 AZ
+#optional, number of instances (default=1)
+#default, private, if only 1 network
+#default, private, if only 1 network
+#optional, used reserved port (IP)
+#default security group for project
+#optinal, for example, custom rules
+#optional
+#optional
+
+::: {.notes}
+Here are some of the most popular options used when creating a VM instance from the command line. To see all of the options, issue the openstack server create -h command.
+For more details on server create, as well as all of the server CLI commands, see the OpenStack.org documentation.
+
+  https://docs.openstack.org/python-openstackclient/ussuri/cli/command-objects/server.html
+:::
+
+
+openstack server create
+--availability-zone <AZ_name_or_ID>
+--min <count>
+--max <count>
+--image <image_name_or_ID>
+--flavor <flavor_name_or_ID>
+--nic net-id=<network_name_or_ID>
+--network <network_name_or_ID>
+--port <port_name_or_ID>
+--security-group <secgrp_name_or_ID>
+--security-group <2nd_secgrp_name_or_ID>
+--key-name <SSH_key_name_or_ID>
+--user-data <file_for_user-init> instance_name
+
+Deploying an instance: CLI + UI
+
+263
+
+![Slide 263 diagram](images/slide_263_image_01.jpg){width="80%"}
+
+::: {.notes}
+The same parameters can be set using the Dashboard UI. In this situation, the Launch Instance dialog uses tabs for each parameter. For example, the Source tab is where you define the image to use via the --image parameter.
+:::
+
+
+# Nova (Compute Service) {.center}
+
+Keystone
+
+![Slide 264 diagram](images/slide_264_image_01.jpg){width="80%"}
+
+::: {.notes}
+When the user logs in to the Dashboard UI or CLI, their user credentials are authenticated with the Identity Service via REST API. This generates an auth-token which is used for the UI session. When the user submits a request, such as a launch instance, a new auth-token is assigned for the request and used for the lifecycle of the request, including inter-component communications.
+Let’s go through this diagram of the process step-by-step.
+The Dashboard UI or CLI converts the launch instance request to a REST API POST request, obtains an auth-token, and sends the request to nova-api. The auth-token is part of the request and will be used throughout the lifecycle of the request.
+The nova-api receives the request and sends a request to the Identity Service for validation of the auth-token and access permission. The Identity Service validates the auth-token and sends updated authentication headers with roles and permissions.
+The nova-api then checks for conflicts with nova-database and creates an initial database entry for the new instance. The nova-api also validates the flavor and the compute resource quotas.
+The nova-api sends the request to Glance (that is the glance-api) to validate the image.
+The nova-api sends a request to Neutron (neutron-server) to validate network, port, and network quotas.
+The nova-api next sends the rpc.call request to nova-conductor expecting to get an updated instance entry with host ID specified.
+The nova-conductor receives and processes the message, sending it to nova-scheduler. The nova-scheduler picks up the request from the queue.
+The nova-scheduler interacts with the placement service to find an appropriate host via filtering and weighing. The nova-scheduler returns the updated instance entry with the appropriate host ID (of chosen hypervisor) after filtering and weighing.
+The nova-conductor sends the rpc.cast request to nova-compute for launching an instance on the appropriate host.
+nova-compute picks up the request from the queue. nova-compute then sends the rpc.call request to nova-conductor to fetch the instance information such as host ID and flavor (meaning RAM, CPU, and Disk) from the database.
+Using the Image ID, nova-compute sends a REST call to glance-api to retrieve the Image URI from the Image Service. nova-compute then loads the image from the image storage and retrieves the image metadata.
+nova-compute performs a REST call to the Neutron API (or neutron-server) to allocate and configure the network so that the instance gets a port with an IP address. The neutron-server sends a request to the DHCP server for an IP address, for example. nova-compute then retrieves the network info.
+nova-compute generates data for the hypervisor driver and executes the request on the hypervisor (via libvirt or specific hypervisor API) to create an instance.
+If a volume is to be attached, nova-compute performs a REST call to the cinder-api to attach the volume to the instance. nova-compute then retrieves the block storage info.
+Important Note: As each component, such as glance-api, receives a request, it validates the auth-token with Keystone before taking any action on the request. If the token is not valid, the request is rejected. The token validation occurs at each step between processes and is not shown or discussed in the flow.
+For more information, see the documentation on the OpenStack.org website.https://docs.openstack.org/nova/ussuri/user/architecture.html
+:::
+
+
+nova-api: accepts all Nova requests (CLI, Dashboard UI, REST API)
+Routes request, such as deploying a virtual machine instance, to the nova-conductor
+nova-conductor:
+Manages the overall flow of requests Reduces the direct database access
+Can run multiple instances of nova-conductor on separate nodes to scale horizontally
+nova-scheduler: determines the appropriate compute node, based on scheduling algorithm
+Scheduler uses data from placement-api to determine target host
+placement service: tracks the inventory and usage of each provider
+For example, an instance created on a compute node may be a consumer of resources such as RAM and CPU from a compute node resource provider, disk from an external shared storage pool resource provider, and IP addresses from an external IP pool resource provider
+
+Nova services ( backup)
+
+265
+
+::: {.notes}
+nova-api supports APIs for both OpenStack and Amazon EC2 (compatible). It communicates with other OpenStack components through message queue (RabbitMQ) or HTTP (in the case of the Swift object store).
+The placement service is a required part of the launch instance process, but it is no longer a part of Nova.
+The nova-api accepts all Nova requests from the CLI, Dashboard UI, or REST API. The nova-api then routes requests, such as deploying a virtual machine instance, to the nova-conductor.
+The nova-conductor manages the overall flow of requests. It reduces the direct database access and can run multiple instances of nova-conductor on separate nodes to scale horizontally.
+The nova-scheduler determines the appropriate compute node based on the scheduling algorithm. The scheduler uses data from placement-api to determine the target host.
+The placement service tracks the inventory and usage of each provider. For example, an instance created on a compute node may be a consumer of resources such as RAM and CPU from a compute node resource provider, a disk from an external shared storage pool resource provider, and IP addresses from an external IP pool resource provider.
+:::
+
+
+nova-compute: interacts with the hypervisor
+Manages communication between OpenStack and hypervisor Runs on each compute node
+Must have a unique compute node per type of hypervisor
+Nova enables users to access VM instances through several VNC clients
+nova-xvpvncproxy is a VNC proxy that supports a Java client
+nova-novncproxy use noVNC to provide VNC support through a Web browser
+nova-spicehtml5proxy use a SPICE connection. Supports browser-based HTML5 client nova-serialproxy service provides an alternative to graphical consoles like VNC or SPICE RDP (Remote Desktop Protocol) is a graphical console primarily used with Hyper-V
+MKS (Mouse, Keyboard and Screen) is used for accessing the console of VMware vSphere instances
+nova-consoleauth (DEPRECATED with Rocky release) manages token authentication between VNC proxies and clients
+
+Nova services (backup)
+
+266
+
+::: {.notes}
+In a production environment where there are multiple machines running OpenStack services, nova-compute runs on the compute node. Nova-compute interacts with the hypervisor and manages communication between OpenStack and the hypervisor.
+nova-compute runs on each compute node. You can run more than one type of hypervisor. You need a separate instance of the compute node with nova-compute process for each type of hypervisor you are supporting, and you must have a unique compute node per type of hypervisor. The most commonly used hypervisor is KVM (with QEMU and libvirtd).
+Nova enables users to access VM instances through several VNC clients as shown here.
+nova-xvpvncproxy is a VNC proxy that supports a Java client.
+nova-novncproxy uses noVNC to provide VNC support through a Web browser.
+nova-spicehtml5proxy uses a SPICE connection. It supports a browser-based HTML5 client.
+nova-serialproxy service provides an alternative to graphical consoles like VNC or SPICE.
+RDP (or Remote Desktop Protocol) is a graphical console primarily used with Hyper-V.
+MKS stands for mouse, keyboard and screen. MKS is used for accessing the console of VMware vSphere instances.
+nova-consoleauth manages token authentication between VNC proxies and clients. It was deprecated with the Rocky release.
+For a full list of supported hypervisors, see the Hypervisor Support Matrix on OpenStack.org.
+    https://wiki.openstack.org/wiki/HypervisorSupportMatrix
+:::
+
+
+Tracks resource provider inventories and usage data
+Resource providers:
+Compute node
+  - DISK_GB
+  - MEMORY_MB
+  - VCPU
+Shared storage pool
+IP allocation pool
+Used by nova-scheduler during the filtering process
+Intended for REST API use
+Supports CLI client plugin; requires API micro versions
+
+Placement service
+
+267
+
+::: {.notes}
+The Placement Service tracks resource provider inventories and usage data. It was first introduced in the Newton release and then separated into its own component in the Stein release. nova-scheduler works with the placement service when it needs to schedule an instance based on host capacity, for example.
+nova-compute is responsible for storing inventory (or usage) data for DISK_GB, MEMORY_MB, and VCPU. Consider inventories as the data types and the actual data stored as the usage data. Inventory is also known as a class.
+Other resource providers include the shared storage pool and the IP allocation pool.
+The placement service is used by nova-scheduler during the filtering process and is intended for REST API use. It supports CLI client plugins and requires API micro versions.
+:::
+
+
+HYPERVISORS
+
+# Nova Requires A Hypervisor To Host The Instances {.center}
+
+::: {.notes}
+In this section we’ll go into more detail about how Nova interacts with hypervisors. To clarify, OpenStack is not a hypervisor. It requires a hypervisor to host the instances.
+A hypervisor is a piece of computer software or hardware that creates and runs virtual machines. A system on which one or more virtual machines is defined is referred to as a host machine.
+:::
+
+
+Hypervisor:  virtual machine monitor, (VMM), virtualizer
+  - Computer software, firmware or hardware that creates and runs virtual machines
+  - Presents the guest operating systems with a virtual operating platform and manages the execution of the guest operating systems
+Host: computer on which a hypervisor runs one or more virtual machines
+Guest: virtual machine, virtual server, instance
+Types:
+  - 1: Software runs as part of the host machine Microsoft Hyper-V, VMware ESXi, Citrix Xen
+  - 2:Hypervisor software runs on top of host machine QEMU, Oracle VM VirtualBox
+
+Hypervisor definition
+
+269
+
+::: {.notes}
+As mentioned earlier, OpenStack is not a hypervisor and thus requires a hypervisor to host the instances.
+Here you can see the definition of hypervisor and some other relevant terminology from Wikipedia.
+A hypervisor is also known as a virtual machine monitor (aka VMM) or a virtualizer. Hypervisors are computer software, firmware or hardware that create and run virtual machines.
+A host is a computer on which a hypervisor runs one or more virtual machines. A guest is a virtual machine, virtual server, or instance. A hypervisor presents the guest operating systems with a virtual operating platform and manages the execution of the guest operating systems.
+There are two types of hypervisors - Type 1 and Type 2. Type 1 is hypervisor software that runs as part of the host machine, for example Microsoft Hyper-V, VMware ESXi, and Citrix Xen. Type 2 is hypervisor software that runs on top of a host machine. Examples of type 2 hypervisors include QEMU and Oracle VM VirtualBox.
+https://en.wikipedia.org/wiki/Hypervisor
+:::
+
+
+Nova supports many hypervisors, however, most installations use only one
+nova-compute interfaces with a single set of hypervisor APIs
+Configured in nova-compute.conf on the compute node, for example:
+virt_type defines the hypervisor---qemu in this case
+Nova uses libvirt to interface with QEMU
+This also applies when using KVM as the hypervisor
+Each hypervisor type requires a unique nova-compute process (host, compute node)
+
+[libvirt]
+virt_type = qemu
+
+Nova hypervisors
+
+270
+
+::: {.notes}
+Nova supports many hypervisors, though most installations use only one. 
+nova-compute interfaces with a single set of hypervisor APIs. These are configured in nova-compute.conf on the compute node, for example if  virt_type is set to qemu in [libvirt], then the virt_type defines the hypervisor, which would be QEMU and Nova would use libvirt to interface with QEMU. Each hypervisor type requires a unique nova-compute process including host and compute node.
+:::
+
+
+KVM (includes QEMU and libvirt)
+QEMU
+VMware vSphere
+LXC (Linux containers) with libvirt Hyper-V virtualization platform
+Xen with libvirt
+XenServer (and other XAPI based Xen variants) Virtuozzo with libvirt
+UML (user-mode Linux)
+PowerVM zVM
+Ironic (Bare Metal as a Service)
+And others!
+
+Supported hypervisors
+
+271
+
+::: {.notes}
+Here is a partial list of hypervisors that are supported by Nova.
+KVM or Kernel-based Virtual Machine is a virtualization infrastructure for the Linux kernel that turns Linux into a hypervisor, using QEMU.
+QEMU (which is short for Quick Emulator) is a free and open-source hosted hypervisor that performs hardware virtualization. This is not to be confused with hardware-assisted virtualization.
+Not shown here is VMware ESXi (formerly called ESX). ESXi is an enterprise-class, type-1 hypervisor developed by VMware for deploying and serving virtual computers. As a type-1 hypervisor, ESXi is not a software application that one installs in an operating system (OS). Instead, it includes and integrates vital OS components, such as a kernel.
+VMware vSphere 5.1.0 and newer runs VMware-based Linux and Windows images through a connection with a vCenter server.
+LXC (or Linux Containers) with libvirt is an operating-system-level virtualization method for running multiple isolated Linux systems or containers on a control host using a single Linux kernel. LXC is managed through libvirt.
+Microsoft Hyper-V, formerly known as Windows Server Virtualization, is a native hypervisor. Hyper-V can create virtual machines on x86-64 systems running Windows. Server virtualization with Microsoft Hyper-V, used to run Windows, Linux, and FreeBSD virtual machines. Now it runs nova-compute natively on the Windows virtualization platform.
+XEN is a hypervisor using a microkernel design. XEN provides services that allow multiple computer operating systems to execute on the same computer hardware concurrently. Xen Project Hypervisor using libvirt is a management interface into nova-compute that is used to run Linux, Windows, FreeBSD and NetBSD virtual machines.
+Citrix XenServer is a hypervisor platform that enables the creation and management of a virtualized server infrastructure. It was developed by Citrix Systems and is built over the Xen virtual machine hypervisor. XenServer provides server virtualization and monitoring services.
+XenServer, Xen Cloud Platform (XCP) and other XAPI based Xen variants run Linux or Windows virtual machines. You must install the nova-compute service in a para-virtualized VM.
+Virtuozzo 7.0.0 and newer are OS Containers and Kernel-based Virtual Machines supported via libvirt virt_type=parallels. The supported formats include ploop and qcow2 images.
+UML or user-mode Linux enables multiple virtual Linux kernel-based operating systems (known as guests) to run as applications within a normal Linux system (known as the host). Typically, this is only used in a development environment.
+PowerVM is server virtualization with IBM PowerVM for AIX, IBM i, and Linux workloads on the Power Systems platform.
+zVM is server virtualization on z Systems and IBM LinuxONE, it can run Linux, z/OS and more.
+Ironic is an OpenStack project which provisions bare metal (as opposed to virtual) machines. It uses technologies, such as Preboot Execution Environment (PXE), Network Bootstrap Program (NBP), Intelligent Platform Management Interface (IPMI), and others.
+Not all supported hypervisors are shown here. Historically, most OpenStack development is done with the KVM hypervisor with which you are more likely to find community support for issues . All features that are currently supported in KVM are also supported in QEMU.
+:::
+
+
+# Hypervisors By % {.center}
+
+https://www.statista.com/statistics/1109443/worldwide-openstack-hypervisors/
+
+![Slide 272 diagram](images/slide_272_image_01.jpg){width="80%"}
+
+::: {.notes}
+As you can see on this chart, KVM is by far the most popular hypervisor used by OpenStack. 89% of OpenStack customers are running KVM for their hypervisor. However, that means their actual hypervisor is QEMU.
+About 26% are running QEMU separately as their hypervisor. Bare metal is growing in popularity at 24%, as are container technologies.
+You are not limited to any single hypervisor. Many OpenStack deployments run multiple hypervisors.
+The only restriction, from a Nova perspective, is that each type of hypervisor (for example, KVM versus Ironic) requires a unique nova-compute node.
+:::
+
+
+# Hypervisors By % {.center}
+
+https://www.statista.com/statistics/1109443/worldwide-openstack-hypervisors/
+
+![Slide 273 diagram](images/slide_273_image_01.jpg){width="80%"}
+
+::: {.notes}
+As you can see on this chart, KVM is by far the most popular hypervisor used by OpenStack. 89% of OpenStack customers are running KVM for their hypervisor. However, that means their actual hypervisor is QEMU.
+About 26% are running QEMU separately as their hypervisor. Bare metal is growing in popularity at 24%, as are container technologies.
+You are not limited to any single hypervisor. Many OpenStack deployments run multiple hypervisors.
+The only restriction, from a Nova perspective, is that each type of hypervisor (for example, KVM versus Ironic) requires a unique nova-compute node.
+:::
+
+
+# Hypervisors By % {.center}
+
+https://www.statista.com/statistics/1109443/worldwide-openstack-hypervisors/
+
+![Slide 274 diagram](images/slide_274_image_01.jpg){width="80%"}
+
+::: {.notes}
+As you can see on this chart, KVM is by far the most popular hypervisor used by OpenStack. 89% of OpenStack customers are running KVM for their hypervisor. However, that means their actual hypervisor is QEMU.
+About 26% are running QEMU separately as their hypervisor. Bare metal is growing in popularity at 24%, as are container technologies.
+You are not limited to any single hypervisor. Many OpenStack deployments run multiple hypervisors.
+The only restriction, from a Nova perspective, is that each type of hypervisor (for example, KVM versus Ironic) requires a unique nova-compute node.
+:::
+
+
+From release to release, and even within a release, OpenStack support of hypervisors might change
+To compare what each hypervisor supports:
+https://docs.openstack.org/nova/latest/user/support-matrix.html https://docs.openstack.org/nova/latest/user/feature-classification.html https://docs.openstack.org/nova/ussuri/admin/arch.html#hypervisors
+Running multiple hypervisors is supported:
+Connect each hypervisor to a different nova-compute node
+Optionally, use filters (ComputeFilter and ImagePropertiesFilter) or image metadata to select the hypervisor at deploy time
+Most OpenStack development and testing is done against KVM
+Many customer environments use only one hypervisor; KVM is the most common
+
+Hypervisor notes
+
+275
+
+::: {.notes}
+OpenStack support of hypervisors can change from release to release, and even within a release. To compare what each hypervisor supports, check the latest documentation on OpenStack.org.
+Running multiple hypervisors is supported. To do so you must connect each hypervisor to a different nova-compute node or optionally, use filters (such as ComputeFilter and ImagePropertiesFilter) or image metadata to select the hypervisor at deploy time.
+Most OpenStack development and testing is done against KVM, and many customer environments use only one hypervisor. As mentioned earlier, KVM is the most commonly used hypervisor.
+https://docs.openstack.org/nova/latest/user/support-matrix.html 
+https://docs.openstack.org/nova/latest/user/feature-classification.html 
+https://docs.openstack.org/nova/ussuri/admin/arch.html#hypervisors
+:::
+
+
+OpenStack provides several additional components to support deployment of:
+Containers using Docker engine (default)
+Zun project
+zun-compute process (similar to nova-compute) zun-compute interfaces with dockerd
+You can run zun-compute on the same node as nova_compute Container orchestration engines (COEs):
+Magnum project
+Uses Heat to deploy COE:
+  - Kubernetes
+  - Docker Swarm
+  - Apache Mesos
+
+Container notes
+
+276
+
+::: {.notes}
+This slide is provided for reference only. Containers are not part of this class.
+OpenStack provides several additional components to support deployment of containers using Docker engine such as Zun project and the zun-compute process which is similar to nova-compute. zun-compute interfaces with dockerd and you can run zun-compute on the same node as nova_compute
+Container orchestration engines (also known as COEs) include the Magnum project as well as several that use Heat to deploy COE, such as Kubernetes, Docker Swarm, and Apache Mesos.
+:::
+
+
+The lab environment is running the following:
+KVM: provides the hardware acceleration
+virtio: provides a better performing I/O framework
+QEMU: provides the actual hypervisor functions libvirt: provides the management tools
+
+Lab environment hypervisor
+
+277
+
+::: {.notes}
+Here is an overview of our lab environment which runs KVM with QEMU. Technically speaking, QEMU is the hypervisor, however there are other components involved. KVM provides the hardware acceleration, virtio provides a better performing I/O framework, QEMU provides the actual hypervisor functions, and libvirt provides the management tools.
+KVM’s use as a hypervisor and its other functions will be discussed later in this section.
+:::
+
+
+libvirt is a set of tools consisting of:
+Management API
+libvirtd daemon to manage instances on a hypervisor
+Start, stop, and migrate instances between hosts Configure and manipulate networking
+Manage storage used by instances
+virsh: (virtualization shell) CLI to manage instances
+virsh-viewer: tool to access instance console
+virt-manager: UI tool to manage instances
+
+Libvirt
+
+278
+
+::: {.notes}
+You will use virsh in our lab exercises. Virsh is one of several tools that are part of libvirt. libvirt is a set of tools that are part of a management API. 
+The libvirtd daemon manages instances on a hypervisor which can start, stop, and migrate instances between hosts, configure and manipulate networking, and manage storage used by instances.
+virsh (or virtualization shell) is a CLI used to manage instances, virsh-viewer is a tool to access instance console, and virt-manager is a UI tool to manage instances.
+:::
+
+
+When you deploy an instance, data is stored locally
+Each instance has a unique folder, using its UUID as the name
+
+cd .../data/nova/instances
+ls –ltr
+…1fa1cf58-133c-4e3a-811f-1170874686ca
+…_base
+… compute_nodes
+…d4626ba1-62c7-4d8f-b6df-177814f8130a
+…locks
+…snapshots
+
+Each instance has a unique libvirt domain (XML) file
+
+cd /etc/libvirt/qemu/
+ls –ltr
+…instance-00000001.xml
+…instance-00000002.xml
+…networks
+
+Miscellaneous
+
+279
+
+::: {.notes}
+When you deploy an instance, data is stored locally. Each instance has a unique folder, each using its UUID as the name as shown here. Each instance also has a unique libvirt domain (XML) file as shown here. These files will be discussed in more depth shortly.
+In the lab environment, the full directory name for the Nova instance folder is: /opt/stack/data/nova/instances/
+In other (non-Devstack) environments, the Nova instance folder might be: /var/lib/nova/instances/
+:::
+
+
+.../data/nova/instances/instance_UUID Contains several files:
+disk: copy of the image disk file
+disk.info: identifies the image type
+console.log: copy of console log during boot of instance
+
+Nova instance folder
+
+280
+
+::: {.notes}
+The instance_UUID file found in the .../data/nova/instances/ directory contains several important  files. These files are:
+disk, which is a copy of the image disk file;
+disk.info, which identifies the image type;
+And console.log, which is a copy of the console log during boot of instance
+:::
+
+
+List instances with virsh command:
+
+virsh list
+Id	 Name	           State
+------------------------------
+13	instance-0000000f  running
+
+...
+
+...
+...
+
+Libvrt - virsh example
+
+281
+
+::: {.notes}
+This slide compares the output from virsh list and openstack server show commands.
+Notice that the instance name is the same for both.
+:::
+
+
+openstack server show test
++	        +
+| Field	| Value
++---------------------------------------------------+--------------------------
+…
+|  OS-EXT-SRV-ATTR:ins tance_name	| instance-0000000f
+…
+| addresses                                              | private=10.0.0.9
+…
+| id                                                          |7bca7142-62bf-42f5-b63e-5778b20e27ca
+
+Display instance with openstack command:
+
+...
+
+...
+...
+
+Libvrt - virsh example
+
+282
+
+::: {.notes}
+This slide compares the output from virsh list and openstack server show commands.
+Notice that the instance name is the same for both.
+:::
+
+
+libvirt creates a domain file for each instance:
+
+cd /etc/libvirt/qemu/
+ls
+instance-0000000f  networks
+
+The domain file contains a lot of information about the instance:
+
+Libvirt domain (xml) file
+
+283
+
+::: {.notes}
+This slide shows parts of the domain (XML) file. The domain file can be found in the /etc/libvirt/qemu/ directory. It contains useful information about the instance.
+You will review a domain file more closely in the lab exercises.
+:::
+
+
+The domain file contains a lot of information about the instance:
+
+<domain type='qemu’>
+<name>	instance-0000000f </name>
+<uuid>      7bca7142-62bf-42f5-b63e-5778b20e27ca  </uuid>
+<metadata>
+…
+<nova:flavor name="m1.tiny">
+<nova:memory>512</nova:memory>
+<nova:disk>1</nova:disk>
+<nova:swap>0</nova:swap>
+<nova:ephemeral>0</nova:ephemeral>
+<nova:vcpus>1</nova:vcpus>
+</nova:flavor>
+...
+<cpu>
+<topology sockets='1' cores='1' threads='1'/>
+</cpu>
+<clock offset='utc'/>
+<on_poweroff>destroy</on_poweroff>
+<on_reboot>restart</on_reboot>
+...
+
+Libvirt domain (xml) file
+
+284
+
+::: {.notes}
+This slide shows parts of the domain (XML) file. The domain file can be found in the /etc/libvirt/qemu/ directory. It contains useful information about the instance.
+You will review a domain file more closely in the lab exercises.
+:::
+
+
+# Nova Flavors {.center}
+
+# Instance Types {.center}
+
+::: {.notes}
+In this next section, we will go over Nova flavors.  A flavor is the hardware configuration that is available for a server. In OpenStack, flavors help define the instance’s compute, memory, and storage capacity. Essentially, flavors define the size that a virtual server can be launched as.
+:::
+
+
+Each VM needs four types of resources
+NIC (at least 1)
+CPU
+Memory
+Hard disk
+Nova flavor: combination of CPU, memory, disk Plus an operating system based on Glance image
+Note: After you deploy an instance, you can resize it
+by specifying a larger flavor (must be supported by hypervisor)
+
+Notice physical machine requires same resources (CPU, memory, disk, NIC); except they are real/physical resources
+
+VM resources - flavors
+
+286
+
+![Slide 286 diagram](images/slide_286_image_01.jpg){width="80%"}
+
+::: {.notes}
+The amount of CPU, memory, and disk that is allocated to a VM is controlled with a Nova flavor. Each VM needs four types of resources: at least one NIC, a CPU, memory, and a hard disk. These flavors are given names such as m1.tiny or m1.small. You specify the flavor when you submit a request to deploy an instance.
+Each VM that is deployed has at least one NIC associated with it. Some VMs will have more. The IP address of the NIC is configured from a pool of addresses assigned to your network. A MAC address is also assigned to the deployed VM, based on the base_mac property in the neutron.conf file.  For example, the MAC address fa:16:3e:4f:00:00 could be assigned to a deployed VM.
+ A Nova flavor is a combination of CPU, memory, and disk plus an operating system based on a Glance image. When the VM is deployed, the request also identifies the Glance image to use. The Glance image must contain, at minimum, a bootable operating system. The image might also contain software that is installed and configured.
+In addition to the operating system you might choose to automatically deploy software to the VM at boot time, for example, using the OpenStack Heat component. You could also choose to manually deploy software after the VM is deployed as well as attach additional block storage (that is Cinder volumes) at boot time or after the VM is deployed.
+Note that after you deploy an instance, you can resize it by specifying a larger flavor. This must be supported by the hypervisor.
+Also note that physical machines require the same resources as VMs (meaning CPU, memory, disk, NIC), The difference here is that they are real/physical resources.
+:::
+
+
+Flavor is virtual hardware template for VM instance.
+Defines sizes for memory, disk, number of cores, and so on.
+
+Administrators can create custom flavors
+For example, 1GB RAM + 10GB disk + 2 vCPUs
+
+Nova flavors
+
+287
+
+![Slide 287 diagram](images/slide_287_image_01.png){width="80%"}
+
+::: {.notes}
+The table here shows the definitions of several different flavors. Flavor is a virtual hardware template for a VM instance, and it defines sizes for memory, disk, number of cores, and so on.
+The flavor is a combination of characteristics (for example, memory, disk, and vCPU) that are used when deploying a VM. For example, if you specify the m1.tiny flavor on a create instance request, the VM will have 1 vCPU, 512MB memory, and a 1GB disk when it is deployed.
+This table shows several flavors that are defined for OpenStack. You can create new flavors if you have the admin role. For example, you could create a flavor with 2 vCPUs, 1GB RAM, and a 10GB disk.
+Most flavors are public. That is, they can be used by all projects in all tenants. You can define private flavors that can only be used by specific projects and tenants. For example, the m1.amphora flavor is private as indicated by public being set to No.
+:::
+
+
+Flavors support the use of metadata Sometimes called extra-specs
+For example:
+define processor architecture to restrict flavor to x86 machines
+enable or disable automatic recovery
+and more!
+Also supports custom metadata
+
+Nova flavor metadata
+
+288
+
+![Slide 288 diagram](images/slide_288_image_01.jpg){width="80%"}
+
+::: {.notes}
+Flavors support the use of metadata, also called extra-specs, For example you could define processor architecture to restrict flavor to x86 machines. You could also enable or disable automatic recovery. Nova also supports custom metadata.
+:::
+
+
+# Controlling Where An Instance Is Deployed {.center}
+
+# Nova Cells {.center}
+
+::: {.notes}
+This section is on controlling where an instance is deployed. The topics here are considered advanced and might not apply to your situation.
+:::
+
+
+What is a cell?
+Grouping of compute nodes with a nova-conductor
+Connected to a shared database and message broker (RabbitMQ) for the group (cluster) 1 or more cells per OpenStack Nova deployment
+cell0 database - (required) “graveyard” for instances whose creation failed; they do not physically exist on any cell cell1, 2, 3... databases - (1 per compute cell) stores detailed information about instances created on those cells  API database (1 per deployment) - to store:
+list of all instances - with info on which compute nodes they are created list of all compute nodes - with info which cell they belong to
+list of all cells - with URLs to reach their databases and message brokers
+Small deployments have only one cell
+
+Nova cells
+
+290
+
+::: {.notes}
+What is a cell? A cell is a grouping of compute nodes with a nova-conductor. Cells allow you to scale an OpenStack Compute (Nova) cloud in a more distributed fashion without having to use complicated technologies like database and message queue clustering. Using cells helps support very large deployments.
+The lab environment you are using is a simple deployment, with cell0 and cell1. There is one compute node and it is in cell1. Small deployments typically have only one cell.
+The purpose of the cells functionality in Nova is specifically to allow larger deployments to share their many compute nodes into cells, each of which has a database and message queue.
+Cells are connected to a shared database and message broker (or RabbitMQ) for the group (or cluster).
+There are one or more cells per OpenStack Nova deployment.
+The cell0 database is required. It is a “graveyard” for instances whose creation has failed. They do not physically exist on any cell.
+cell1, cell2, cell3 and so on are essentially databases. There is one DB per compute cell that stores detailed information about instances created on those cells.
+There is one API database per deployment. It is used to store a list of all instances (with info on which compute nodes they are created), a list of all compute nodes (with info about which cells they belong to), and a list of all cells (with URLs to reach their databases and message brokers).
+The pairing of a transport_url and a [database] connection configured in nova.conf for a nova-compute service defines what cell the service lives in.
+:::
+
+
+All of the services are configured to talk to each other over the same message bus and there is only one cell database where live instance data resides.
+The cell0 database is required, but no compute nodes are connected to it.
+
+Simple nova deployment - 1 cell
+
+291
+
+![Slide 291 diagram](images/slide_291_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows a simple Nova deployment with one cell. All of the services are configured to talk to each other over the same message bus and there is only one cell database where live instance data resides. The cell0 database is required, but no compute nodes are connected to it.
+:::
+
+
+Each cell (cell1 and cell2) has its own nova-conductor process, with 1 or more nova-compute nodes, plus a message  bus and cell database where live instance data resides.
+cell0 database is required but no compute nodes are connected to it.
+
+Nova deployment - multiple cells
+
+292
+
+![Slide 292 diagram](images/slide_292_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows a Nova deployment with two cells. Each cell, cell1 and cell2, has its own nova-conductor process and one or more nova-compute nodes. Each cell also has a message bus and cell database where live instance data resides.
+The cell0 database is required but no compute nodes are connected to it.
+For more information about cells as well as restrictions related to their use, see the documentation on the OpenStack.org website:
+    https://docs.openstack.org/nova/latest/user/cellsv2-layout.html
+:::
+
+
+# Nova Scheduler - Filtering And Weighing {.center}
+
+# Controlling Where An Instance Is Deployed {.center}
+
+::: {.notes}
+This next section will address using Nova Scheduler to control where an instance is deployed using filtering and weighting. The topics in this section are routinely considered in a production environment. They are not as important in a test or development environment.
+:::
+
+
+Filtering
+nova-scheduler iterates through the list of compute nodes
+Evaluating each against a set of filters
+
+Weighting
+The list of resulting hosts is ordered by weights Re-ordering the list by priority
+
+Nova scheduling overview
+
+294
+
+![Slide 294 diagram](images/slide_294_image_01.jpg){width="80%"}
+
+::: {.notes}
+The image here gives an overview of how Nova scheduling works.
+The first phase involves filtering in which the nova-scheduler iterates through the list of compute nodes and evaluates each against a set of filters. In this case, Hosts 1-6 are run through a filter and Host 2 and Host 4 are eliminated.
+The next phase is weighting. After filtering, the list of resulting hosts is re-ordered by priority using weights. In this case, the four post-filter hosts are ordered so that the best variant is Host 5 and the worst is Host 6.
+The end goal of this filtering and weighting process is fpr the nova-scheduler to locate one compute host capable of satisfying the request. If there are more than one host in the list, nova-scheduler randomly chooses one. If there are no hosts capable of satisfying the request, you will see a “no valid hosts found” message.
+For more information about using filtering and weighting, see the OpenStack documentation.
+    https://docs.openstack.org/nova/latest/user/filter-scheduler.html
+:::
+
+
+Filters: Determines which compute nodes are eligible for a request (30 total filters)
+CoreFilter: Only schedules instances on hosts if sufficient physical CPU cores are available
+DiskFilter: Only schedules instances on hosts if there is sufficient disk space available for root and ephemeral storage RamFilter: Only schedules instances on hosts that have sufficient RAM available
+DifferentHostFilter: Schedules the instance on a different host from a set of instances SameHostFilter: Schedules the instance on the same host as another instance in a set of instances ImagePropertiesFilter: Filters hosts based on properties defined on the instance image
+Weighting: Applied after filtering, weights are used to prioritize which host is chosen
+RAM weigher: Sort with the host with the most RAM winning CPUWeigher: Sort with the host with the most vCPU winning DiskWeigher: Sort with the host with the most disk space winning
+Default behavior (without weights) is to spread instances across all hosts evenly
+You can define custom filters and weighting metrics
+
+Nova scheduling: filters & weighting
+
+295
+
+::: {.notes}
+Here you can see a subset of the most common filters and weights. The Nova scheduling filters are defined in the nova.conf file on the controller node. By default, all 30 filters are loaded. You might not want to use all those filters. In that case, you can specify the enabled_filters property in nova.conf to define the filters you want to use.
+A note on terminology. In this case, “host” means a compute node/hypervisor pair.
+Filters are used to determine which compute nodes are eligible for a request. Again, there are 30 filters in total. Here are six of the more commonly used filters.
+- The CoreFilter looks for hosts with sufficient physical CPU cores.
+- DiskFilter looks for sufficient available disk space for root and ephemeral storage.
+- RamFilter filters for hosts that have sufficient RAM available.
+- The DifferentHostFilter schedules the instance on a different host from a set of instances, while the SameHostFilter does the opposite.
+- ImagePropertiesFilter filters hosts based on properties defined on the instance image.
+Weighting is applied after filtering. weights are used to prioritize which host is chosen. The RAM weigher prioritizes hosts with the most RAM. CPUWeigher prioritizes hosts with the most vCPU. DiskWeighe bases the prioritization on which host have the most disk space. The default behavior is essentially no weighting. In this case the priority will be spread across all hosts evenly.
+The Nova filters and weighting options are documented on the OpenStack.org website.
+    https://docs.openstack.org/nova/ussuri/user/filter-scheduler.html
+:::
+
+
+Define and enable filters
+nova.conf:
+[filter_scheduler]
+available_filters = nova.scheduler.filters.all_filters  enabled_filters = RetryFilter,AvailabilityZoneFilter,ComputeFilter,
+ComputeCapabilitiesFilter,ImagePropertiesFilter,  ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter, SameHostFilter,DifferentHostFilter
+For example, ComputeCapabilitiesFilter:
+Verifies the compute host resources (CPU, RAM, disk) can satisfy the request Passes all hosts, that can satisfy the request, to next filter
+
+Nova-scheduler filter examples
+
+296
+
+::: {.notes}
+Here is one example of how to use nova-scheduler filters to define and enable filters.
+In this example, all thirty filters were set as available in the nova.conf file under the [filter_scheduler] section. From there, nine filters were selected and enabled as shown.
+For example, one of those filters, ComputeCapabilitiesFilter, verifies that the compute host resources (that is CPU, RAM, disk) can satisfy the request. All hosts that can satisfy the request would be passed to the next filter.
+Note that the default filters are enabled without updating the config file.
+:::
+
+
+openstack server create --image <image_name> --flavor m1.tiny … <instance_name>
+
+nova-scheduler log:
+
+nova-scheduler[24640]: nova.filters … Starting with 1 host(s)... get_filtered_objects
+
+Nova-scheduler filters example
+
+297
+
+nova-scheduler[24640]: Filter RetryFilter returned 1 host(s)#033[00m #033[00;33m{{(pid=25737)
+nova-scheduler[24640]: Filter AvailabilityZoneFilter returned 1 host(s)…
+nova-scheduler[24640]: Filter ComputeFilter returned 1 host(s)…
+nova-scheduler[24640]: Filter ComputeCapabilitiesFilter returned 1 host(s)…
+nova-scheduler[24640]: Filter ImagePropertiesFilter returned 1 host(s)…
+nova-scheduler[24640]: Filter ServerGroupAntiAffinityFilter returned 1 host(s)…
+nova-scheduler[24640]: Filter ServerGroupAffinityFilter returned 1 host(s)…
+nova-scheduler[24640]: Filter SameHostFilter returned 1 host(s)…
+nova-scheduler[24640]: Filter DifferentHostFilter returned 1 host(s)…
+nova-scheduler[24640]: nova.scheduler.filter_scheduler …
+Filtered [(vlab, vlab) ram: 15015MB disk: 4096MB io_ops: 0 instances: 1]…
+nova-scheduler[24640]: nova.scheduler.filter_scheduler
+Weighed [WeighedHost [host: (vlab, vlab) ram: 15015MB disk: 4096MB io_ops: 0 instances: 1, weight: 0.0]
+nova-conductor[25412]: nova.conductor.manager … Selected host: vlab; Selected node: vlab; Alternates: []
+nova-compute[25843]:	acquired by "nova.compute.manager._locked_do_build_and_run_instance"
+
+nova-scheduler[24640]: Filter
+
+::: {.notes}
+Here is another example of filters and weighting. Using the default filters enabled in nova.conf, you see each filter in the nova-scheduler log file.
+In this example, there is only one host and none of the filters removed the host from the list of valid hosts.
+Since there is only one host, weighting is non-operational, and thus the one host is the only option.
+:::
+
+
+For example, suppose you need an instance which requires a host that runs an ARM-based processor and QEMU as the hypervisor
+Enable the ImagePropertiesFilter filter:
+  - [filter_scheduler]
+  - available_filters = nova.scheduler.filters.all_filters
+  - enabled_filters = ...,ImagePropertiesFilter,...
+Add those properties (metadata) to an image:
+
+openstack image set --property CIM_PASD_ProcessorArchitecture=arm
+--property hypervisor_type=qemu <arm-image-name>
+openstack image show <arm-image-name> | grep properties
+| properties	| CIM_PASD_ProcessorArchitecture='ARM', hypervisor_type='qemu',...
+
+ImagePropertiesFilter example
+
+298
+
+::: {.notes}
+Suppose you need an instance which requires a host that runs an ARM-based processor and QEMU as the hypervisor. First, you would enable the ImagePropertiesFilter filter in the nova.conf file as shown here. The ImagePropertiesFilter verifies any architecture, hypervisor type, or virtual machine mode properties specified on the image properties (or metadata). 
+Second, you would add those properties (or metadata) to an image using the command openstack image set with the flags shown here. Use openstack image show to see those properties.
+Supported Image Properties Filters include architecture, hypervisor_type, hypervisor_version_requires, and vm_mode,
+The architecture filter describes the machine architecture required by the image. Examples are i686, x86_64, arm, and ppc64. In this example, the nova-scheduler is unable to find a host with an architecture that matches ‘ARM.’ Note that for QEMU, you should use x86_64.
+The hypervisor_type filter describes the hypervisor required by the image. Examples are xen, qemu, and xenapi.
+The hypervisor_version_requires filter describes the hypervisor version required by the image.
+And the vm_mode filter describes the hypervisor application binary interface (ABI) required by the image.
+For more details, see OpenStack.org documentation on schedulers and useful-image-properties.
+https://docs.openstack.org/nova/ussuri/admin/configuration/schedulers.html 
+https://docs.openstack.org/glance/ussuri/admin/useful-image-properties.html
+:::
+
+
+Deploy an instance using the image:
+
+openstack server create --image <arm-image-name> --flavor m1.tiny … <instance-name>
+If the compute node satisfies BOTH properties, the instance is created. If not, the instance is not created. Look in the nova-scheduler log:
+Filtering removed all hosts for the request with instance ID 'bd1d2644-ee99-4cd6-ab96-87c682afabff'. Filter results: ['RetryFilter: (start: 1, end: 1)', 'AvailabilityZoneFilter: (start: 1, end: 1)',
+'ComputeFilter: (start: 1, end: 1)', 'ComputeCapabilitiesFilter: (start: 1, end: 1)',
+
+'ImagePropertiesFilter: (start: 1, end: 0)’]
+
+No valid host was found. There are not enough hosts available.
+
+ImagePropertiesFilter example
+
+299
+
+::: {.notes}
+Once the properties have been added to the image using the command openstack image set  you can deploy the instance using the image via the openstack server create command shown here.
+If the compute node satisfies BOTH properties, the instance is created. If not, the instance is not created. Look in the nova-scheduler log to see the reason the instance was not created.
+For more details, see documentation on OpenStack.org on schedulers and useful-image-properties.
+https://docs.openstack.org/nova/ussuri/admin/configuration/schedulers.html 
+https://docs.openstack.org/glance/ussuri/admin/useful-image-properties.html
+:::
+
+
+# Controlling Where An Instance Is Deployed {.center}
+
+# Server Groups {.center}
+
+::: {.notes}
+In this next section, we will explore how by using server groups, you can control which compute nodes are used based on policies.
+:::
+
+
+Server groups allow you to influence the nova-scheduler process; selecting compute nodes based on policy
+Specified when you deploy instances
+Supported policies:
+affinity: (default) all instances belonging to the server group are hosted on the same compute node soft affinity: affinity ... if possible
+anti-affinity: instance belonging to the server group are hosted on different compute nodes soft anti-affinity: anti-affinity ... if possible
+Multiple server groups are supported Managed from CLI or UI
+
+Server groups
+
+301
+
+::: {.notes}
+Using server groups, you can influence the nova-scheduler process and control which compute nodes are used based on policies. Server groups are specified when you deploy instances.
+Supported policies include affinity, sort affinity, anti-affinity, and soft anti-affinity.
+affinity is the default. With affinity, all instances belonging to the server group are hosted on the same compute node. With soft affinity, the affinity policy is applied if possible.
+When using the anti-affinity policy, instances belonging to the server group are hosted on different compute nodes.  For example, suppose you need to deploy instances that run applications or services such as SQL server, and cannot afford to have a downtime. In that case, you would choose a server group with the anti-affinity policy defined.
+With soft anti-affinity, the anti-affinity policy is applied if possible.
+Multiple server groups are supported, and server groups are managed from CLI or UI.
+:::
+
+
+Use of server groups requires nova-scheduler filters in
+nova.conf:
+
+Nova-scheduler filters
+
+[filter_scheduler]
+available_filters = nova.scheduler.filters.all_filters
+enabled_filters   =…ServerGroupAntiAfinityFilter,ServerGroupAffinityFilter,
+
+::: {.notes}
+Here you can see how to enable server groups in the nova.conf file. Note that the default filters are enabled without updating the config file.
+The ServerGroupAffinityFilter ensures that each instance in a group is deployed on the same host (or compute node). The ServerGroupAntiAffinityFilter ensures that each instance in a group is deployed on a different host (or compute node).
+If preferred, you can specify server group as a hint in CLI using the openstack server create command.
+:::
+
+
+Specify server group as a hint in CLI:
+
+openstack server create \
+--image <image_name_or_ID> \
+--flavor <flavor_name_or_ID> \
+--nic net-id=<network_name_or_ID> \
+--security-group <secgrp_name_or_ID> \
+--security-group <2nd_secgrp_name_or_ID> \
+--key-name <SSH_key_name_or_ID> \
+--availability-zone  <AZ_name_or_ID> \
+--user-data <file_for_user-init> \
+--hint_group=<Server Group ID> <Server Name>
+
+Nova-scheduler filters
+
+::: {.notes}
+Here you can see how to enable server groups in the nova.conf file. Note that the default filters are enabled without updating the config file.
+The ServerGroupAffinityFilter ensures that each instance in a group is deployed on the same host (or compute node). The ServerGroupAntiAffinityFilter ensures that each instance in a group is deployed on a different host (or compute node).
+If preferred, you can specify server group as a hint in CLI using the openstack server create command.
+:::
+
+
+UI example
+
+![Slide 304 diagram](images/slide_304_image_01.jpg){width="80%"}
+
+::: {.notes}
+This slide shows an example of using the Dashboard UI to launch two instances with a server group, softantiaffinity, that specifies the Soft Anti-affinity policy.
+Since Soft Anti-affinity is specified, both instances might actually be deployed to the same compute node.
+:::
+
+
+# Controlling Where An Instance Is Deployed {.center}
+
+REGIONS, AVAILABILITY ZONES, HOST AGGREGATES
+
+::: {.notes}
+This next section will address using regions, availability zones, and host aggregates to control where an instance is deployed. The topics in this section are routinely considered in a production environment. They are not as important in a test or development environment.
+:::
+
+
+Regions: grouping of OpenStack services, typically grouped geographically
+Ignoring HA, there can only be 1 Keystone and 1 Dashboard UI service, regardless of the number of regions
+Availability Zones: grouping of nova-compute nodes within a region
+Host aggregates: used to group compute nodes independent of AZs
+
+Regions, availability zones, & host aggregates
+
+306
+
+OpenStack clouds can be divided (segregated) into three main hierarchical groupings:
+
+::: {.notes}
+OpenStack clouds can be divided (or segregated) into three main hierarchical groupings: Regions, Availability Zones and Host Aggregates.
+Regions is a grouping of OpenStack services, typically grouped geographically. Ignoring high availability, there can only be one Keystone and one Dashboard UI service, regardless of the number of regions.
+Availability Zones is a grouping of nova-compute nodes within a region
+The Host Aggregates grouping is used to group compute nodes independent of Availability Zones.
+The segregation of OpenStack services enables OpenStack to support massive horizontal scaling. Most OpenStack implementations do not require such a massive scale, although the use of regions, availability zones, and host aggregates is common in smaller implementations.
+:::
+
+
+When you deploy an instance, you can specify the AZ to use
+openstack server create … --availability-zone <AZ_name_or_ID>
+  - Lab environment has 1 AZ (nova); therefore, it is the default AZ
+Specifying an AZ uses a subset of compute nodes in a region.
+You cannot specify a region, nova-scheduler will select the compute node with a region
+Host aggregates are implied, based on metadata defined in the flavor
+
+307
+
+Regions, availability zones, & host aggregates
+
+::: {.notes}
+When you deploy an instance, you can specify which Availability Zone to use via the openstack server create command shown here. Your lab environment has one AZ (Nova). Therefore, it is the default Availability Zone.
+Specifying an AZ uses a subset of compute nodes in a region. You cannot specify a region. nova-scheduler will select the compute node with a region.
+Host aggregates are implied. They are based on metadata defined in the flavor.
+:::
+
+
+Regions, availability zones, & host aggregates
+
+![Slide 308 diagram](images/slide_308_image_01.png){width="80%"}
+
+::: {.notes}
+This image illustrates OpenStack regions, availability zones, and host aggregates. By default, there is one availability zone (nova) and one region (RegionOne).
+In this example, there are two regions - RegionOne and RegionTwo. They have a total of 10 hosts (or nova-compute nodes). RegionOne has three availability zones and seven hosts total - AZ 1 with two hosts, AZ 2 with three hosts, and AZ 3 with two hosts.
+RegionTwo has two availability zones and three hosts total - AZ A with one host and AZ B with two hosts. RegionOne also has two host aggregates defined. One is for SSD disks. It is shown as the black dashed box. The other host aggregate is for fast NICs  and is shown as the red dashed box.
+Host aggregates are logical groupings of compute nodes within a region. The hosts in the host aggregate might span availability zones within the region. Notice, for example, there is one nova-compute (or host) that intersects both of the host aggregates. Remember that when you deploy an instance, you have the option of specifying which availability zone to use.
+:::
+
+
+Setting up a host aggregate (admin role)
+
+![Slide 309 diagram](images/slide_309_image_01.png){width="80%"}
+
+::: {.notes}
+Details for setting up a host aggregate and using it to deploy an instance are shown here.
+To create a host aggregate, first you need to click Admin > Compute > Host Aggregates. Then click Create Host Aggregate. Next, create the host aggregate (for example, MyHostAgg). At this point, you can optionally assign hosts to the host aggregate. Finally, add metadata to the host aggregate, such as SSD = true and fast_NIC = true.
+Second, you can create a new custom flavor. For example, here we are creating m1.custom. To do so, you need to click Admin > Compute > Flavors. Next click Create Flavor. Last, click Update Metadata to add metadata to the flavor matching the host aggregate metadata, for example SSD=true.
+Third, you can deploy a VM instance and specify the custom flavor via the UI. You can also use the CLI with the openstack server create command.
+:::
+
+
+# Customizing Instances At Boot Time {.center}
+
+# (Using User-Data & Cloud-Init) {.center}
+
+::: {.notes}
+This next section will address using user-data and cloud-init to customize instances at boot time.  The topics in this section are routinely considered in a production environment. They are not as important in a test or development environment.
+:::
+
+
+openstack server create --image ... --flavor ... --user-data mydata.file …  <VM name>
+
+mydata.file:
+
+#!/bin/bash
+< insert code here to retrieve user ($newuser) and password ($newpassword) from corporate directory >
+# quietly add a user without password
+adduser --quiet --disabled-password --shell /bin/bash --home /home/$newuser --gecos "User" $newuser
+# set password
+echo "$newuser:$newpassword" | chpasswd
+
+Customing an instance with user data
+
+311
+
+::: {.notes}
+The ability to customize a VM is not limited to Heat templates.
+- Here we see an example using the openstack server create command with a script provided to Nova in the mydata.file.
+- The script will automatically define a new user ID and password using user-data (as well cloud-init) at initial boot time of the VM.
+- The user ID and password are retrieved from a corporate directory (for example, Microsoft Active Directory) as variables $newuser and $newuserpassword.
+A special key in the metadata service holds the provided user data until boot time when the guest instance can access it.
+:::
+
+
+# Deploying Instances With Ssh Keys {.center}
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+312
+
+::: {.notes}
+This next section will address deploying instances with SSH keys.  The topics in this section are routinely considered in a production environment. They are not as important in a test or development environment.
+:::
+
+
+You can define SSH keys; giving your instance a much stronger layer of security
+You use the key for SSH connections, instead of standard name/password credentials
+Denies password authentication Requires a key instead
+OpenStack can inject an SSH key into instances when deployed
+Keys can be
+Created from Nova
+Created externally and imported to Nova
+
+Deploying instances with SSH keys
+
+313
+
+::: {.notes}
+You can define SSH keys. This gives your instance a much stronger layer of security. The key you define can be used for SSH connections instead of standard name/password credentials. An SSH connection denies password authentication and requires a key instead.
+OpenStack can inject an SSH key into instances when deployed.
+Keys can be created from Nova, created externally, and imported to Nova.
+:::
+
+
+Project > Compute > Key Pairs : Create Key Pair
+
+Step 1A
+
+314
+
+# Create Ssh Key In Dashboard Ui {.center}
+
+Key type is SSH
+
+Name of Key pair
+
+![Slide 314 diagram](images/slide_314_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here you can see how to use the Dashboard UI to create an SSH key. To do so click Project > Compute > Key Pairs. Once in the Key Pair panel, click “+Create Key Pair.” This will display the Create Key Pair panel. There you can define a key pair name, such as “mykey.”
+Next, select the key pair type “SSH” and click “Create Key Pair.” This creates the new SSH key and automatically download it to your local machine.
+You might have SSH keys already defined that you wish to use. In that case, use the Import public key function on the Key Pairs panel.
+:::
+
+
+Project > Compute > Key Pairs : mykey
+
+Step 1B.
+
+# Display Ssh Key In Dashboard Ui {.center}
+
+![Slide 315 diagram](images/slide_315_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here you can see the contents of the mykey SSH key. This file is generated by Nova and can be displayed in the Dashboard UI by going to Project > Compute > Key Pairs : mykey.
+:::
+
+
+Step 2
+
+Copy (FTP) the downloaded key pair into ~/.ssh/
+The new SSH key is automatically downloaded to your local machine
+Change permissions to 600:
+# cd ~/.ssh
+# chmod 600 mykey.pem
+
+316
+
+# Copy And Secure Ssh Key {.center}
+
+::: {.notes}
+To use your new key pair, you need to make it available to your SSH client. The steps shown here demonstrate the process for copying and securing an SSH key. They are for a Linux Ubuntu 18.04 LTS environment.
+First, use FTP to copy the downloaded key pair into ~/.ssh/  The new SSH key is automatically downloaded to your local machine.  Next, change permissions on the mykey.pem file to 600 using chmod.
+In some environments, you might need to create the ssh folder. On Windows, how you use your new key will depend on your client.
+:::
+
+
+Follow usual steps to deploy VM instance
+Key Pair tab: select the new SSH key
+
+Step 3--Deploy instance with SSH key
+
+317
+
+![Slide 317 diagram](images/slide_317_image_01.jpg){width="80%"}
+
+::: {.notes}
+At this point, you should understand how to create a VM instance from the Dashboard UI.  To deploy an instance with an SSH key, follow usual steps to deploy a VM instance. In the Key Pair tab, select the new SSH key.
+Note that you can also import or create a new SSH key on this panel, when you deploy an instance.
+:::
+
+
+Step 3—instance details
+
+![Slide 318 diagram](images/slide_318_image_01.png){width="80%"}
+
+::: {.notes}
+Here you can see more details about an instance on the VMwithKey tab in the Dashboard UI.
+Under IP Addresses, you can see the floating IP.
+Under Security Groups, you can see a custom security group allowing port 22 traffic.
+Under Metadata, the key name is shown to be “mykey.”
+:::
+
+
+Step 4—Connect to instance using SSH key
+
+Use the key pair to connect to instance using the SSH key:
+# ssh -i /opt/stack/.ssh/mykey.pem cirros@floating_IP
+Note: To connect to an instance, you need the following:
+SSH port (22) open (security group rule)
+Public IP to access the instance (floating IP address)
+
+319
+
+::: {.notes}
+You can utilize the CLI and use the key pair to connect to an instance using an SSH key. To do so, you need for the SSH port (port 22) to be open using a security group rule. You also need a public IP address to access the instance. The IP needed is the same as the floating IP address shown earlier.
+:::
+
+
+# Additional Considerations {.center}
+
+# Miscellaneous Topics {.center}
+
+::: {.notes}
+This next section covers some miscellaneous topics and additional considerations around resource limitations.
+:::
+
+
+Nova flavor defines VM disk size
+Root disk: Amount of disk space in gigabytes to use for the root partition
+Ephemeral disk: Amount of disk space (in gigabytes) to use for the ephemeral partition. This is an empty, unformatted disk and exists only for the life of the instance. Ephemeral disks are not included in any snapshots.
+Swap: Optional swap space (in megabytes) allocation for the instance
+Glance image has min_disk value in metadata for the image
+The disk size specified in the flavor can not be smaller than the min_disk value for the image
+If it is, you see an error deploying the VM
+
+Flavor disk size vs image min_disk
+
+321
+
+::: {.notes}
+When you deploy a virtual machine you specify the flavor as a parameter on the nova boot command. If the disk size for the flavor is smaller than the min_disk for the image, you see an error. You must choose a flavor with a disk size that is larger than the min_disk for the image.
+- Nova flavor defines VM disk size.
+- Root disk is the amount of disk space in gigabytes to use for the root partition.
+- An ephemeral disk is the amount of disk space (in gigabytes) to use for the ephemeral partition.
+- This is an empty, unformatted disk and exists only for the life of the instance.
+- Ephemeral disks are not included in any snapshots.
+- Lastly, swap is the optional swap space allocation (in megabytes) for the instance
+Glance image has a min_disk value in metadata for the image. The disk size specified in the flavor cannot be smaller than the min_disk value for the image. If it is, you will see an error when deploying the VM.
+If you are deploying the instance from the Horizon dashboard UI, you will see an indicator that you cannot select a flavor if its disk size is smaller than the min_disk value for the image.
+- Consider this.
+- Suppose you have an image with a min_disk value of 5GB.
+- You cannot use the m1.tiny flavor to deploy a VM with the image.
+- The disk size specified in m1.tiny is only 1GB.
+- You need to use the m1.small flavor (20GB disk).
+- However, you are deploying a VM with too much disk space!
+- Therefore, you can consume disk space more quickly.
+- This example shows the need for a custom flavor with a smaller disk allocation.
+- For example, 10GB (or even less).
+- The difference (10GB) is not huge, but when you multiply it over thousands of VMs, it adds up quickly.
+:::
+
+
+over-committing of resources (CPU and memory): Many customers recognize that not every deployed VM is active 100% of the time. Therefore, to maximize their resources, they typically overcommit their CPU and memory resources by a factor of, for example, 10%. resize: Once you deploy a VM (specifying a flavor, such as m1.tiny), you can resize the VM to a larger flavor.
+Must be supported by the hypervisor Also requires config definitions
+quotas: Cloud administrators can (artificially) limit the amount of resources that can be consumed by any single customer (domain), project, or user.
+Images can be pre-cached on compute nodes to reduce instance deploy time
+
+Other conditions
+
+322
+
+::: {.notes}
+There are other important topics to consider.
+- First, over-committing of resources, meaning CPU and memory.
+- Many customers recognize that not every deployed VM is active 100% of the time.
+- Therefore, to maximize their resources, they typically overcommit their CPU and memory resources by a factor of something like 10%, for example.
+- This approach is especially true when the customers are involved in a charge-back mechanism where they are paying for the cloud resources.
+- In that case, they do not want to pay for resources that are not running.
+- Typically, they are charged for a smaller fee for the resources allocated and another fee for the amount of time the resource is active.
+There are 2 properties that can be added to the nova.conf file to support this:
+        cpu_allocation_ratio        ram_allocation_ratio
+Second, resize. After deploying a VM (specifying a flavor, such as m1.tiny), you might need to make it larger. You can resize the VM using a bigger flavor. Important things to be aware of are that resizing must be supported by the hypervisor and this change also requires config definitions.
+You might need to update nova.conf with: 
+allow_resize_to_same_host = True
+Another consideration is quotas. Cloud administrators can use quotas to artificially limit the amount of resources that can be consumed by any single tenant, project (that is, team) or user. This prevents any of the available resources from being consumed, thus limiting the amount of resources available for the remaining tenants, projects, or users.
+Last, be aware that images can be pre-cached on compute nodes to reduce instance deployment time.
+:::
+
+
+# Resource Quotas {.center}
+
+::: {.notes}
+This lesson discusses quotas for OpenStack resources.
+:::
+
+
+Quotas are operational limits Requires admin role to set
+Prevent system capacities from being exhausted without notification
+Quotas limit the resources that can be consumed by any one tenant (customer/domain) or project (team) Project-level quotas managed with CLI
+Default (global) quotas defined in code; can be set in *.conf file
+Nova / Cinder / Glance / Neutron / etc
+Enforced by *-api process when receiving a request
+When you try to create more resources than the quota allows, an error occurs:
+Quota exceeded for resources: ['network']
+
+Quotas – general overview
+
+324
+
+::: {.notes}
+Quotas are operational limits that prevent any one project from consuming all of your cloud resources such as IP addresses, amount of vCPU, number of instances, networks, vm resources, volumes, images, etc.  Prevent system capacities from being exhausted without notification. Quotas limit the resources that can be consumed by any one tenant (meaning customer and domain) or project (or team).
+Quotas are defined at the component level, such as Nova quotas for virtual machine resources (vCPU, RAM, etc).  Setting and managing quotas requires the admin role. Default (or global) quotas are defined in code. They can be set in *.conf file for Nova, Cinder, Glance, Neutron, etc. Project-level quotas can be managed with the CLI by using the openstack quota {set | list} command.
+Quotas are enforced by *-api process when receiving a request. You’ll know that you’ve tried to create more resources than the quota allows when this error occurs: Quota exceeded for resources: ['network']
+For more information about setting quotas, check the OpenStack documentation:
+    https://docs.openstack.org/horizon/latest/admin/set-quotas.html
+:::
+
+
+Nova quotas relate to virtual machine resources:
+cores: Number of instance cores (VCPUs) allowed allowed per project
+instances: Number of instances allowed per project
+metadata_items: Number of metadata items allowed per instance
+ram: Megabytes of instance ram allowed per project
+server_groups: Number of server groups per project
+server_group_members: Number of servers per server group
+Quotas are enforced by nova-api making a claim, or reservation, on resources, such as, when a create instance request is made
+
+Compute (nova) quotas
+
+325
+
+::: {.notes}
+- Nova quotas relate to virtual machine resources including cores, instances key_pairs, metadata_items, ram, server_groups, and server_group_members.
+- Quotas are enforced by nova-api making a claim, or reservation, on resources, for example when a create instance request is made.
+- Default (or domain-level) quotas are commented out in the nova.conf file, including the default driver to use for quota checks.
+cores refers to the number of instance cores (VCPUs) allowed per project.
+instances is the number of instances allowed per project.
+key_pairs is the number of key pairs allowed per user.
+metadata_items is the number of metadata items allowed per instance.
+ram is the megabytes of instance ram allowed per project.
+server_groups is the number of server groups per project.
+server_group_members is the number of servers per server group.
+   
+Note that there is no quota for disk usage.
+If needed, you can use Linux to set limits. Currently, there is a development item to implement a local_gb (disk) quota. It might be available in a future release.
+Previous releases supported compute quotas for resources such as, networks, fixed IPs, floating IPs, and more. However, those were also defined as network quotas thus causing confusion. Therefore, they are no longer available as compute quotas.
+:::
+
+
+demo project:
+openstack quota list --detail --compute
+
+admin project:
+openstack quota list --detail --compute
+
+CLI compute quotas: project level
+
+326
+
+::: {.notes}
+Here we see compute quotas for the demo and admin projects which are displayed via openstack quota list --detail --compute. The instances quotas have been highlighted in yellow. The demo project instances quota is set to a maximum of 5. The admin project instances quota is set to -1, which means there is no defined limit.
+:::
+
+
+Demo project ID: 5a4512c51df34082b067adcb94374a3f
+Admin project ID: cb9c614cde114acea70e9d45ca070454
+
+CLI compute quotas: all projects
+
+327
+
+::: {.notes}
+- Here you can see another way to view compute quotas for the demo and admin projects using openstack quota list --compute.
+- In this case we did not specify which project the information was needed for, and in turn it displayed compute quotas for all projects.
+- Again, the demo project instances quota is set to a maximum of 5, and the admin project instances quota is set to -1.
+- In other words there is no limit defined for the admin project instances quota.
+:::
+
+
+Compute
+
+Networks
+
+Volume
+
+| backup-gigabytes
+| backups
+| gigabytes
+
+| 1000
+| 10
+| 1000
+
+| gigabytes 	DEFAULT	 | -1
+| gigabytes_lvmdriver-1 | -1
+| per-volume-gigabytes	| -1
+
+| snapshots	| 10
+| snapshots 	DEFAULT	 | -1
+| snapshots_lvmdriver-1 | -1
+
+| volumes	| 10
+| volumes 	DEFAULT		| -1
+
+| volumes_lvmdriver-1	| -1
+
+openstack quota show --default
+
+CLI DOMAIN Default QUOTAS
+
+328
+
+::: {.notes}
+From the CLI, openstack quota  show --default will show default quotas for the domain for all services. In this case we see compute through Nova, network via Neutron, and volume through Cinder.
+To display all quotas for a given project, use the command openstack quota show <project_name>
+:::
+
+
+UI domain default quotas
+
+![Slide 329 diagram](images/slide_329_image_01.jpg){width="80%"}
+
+::: {.notes}
+The UI displays domain defaults for quotas across compute, volume, and network services. The default quotas for instances is shown here.
+For example, using these quotas, you can deploy a total of 10 instances.
+That said, all quotas must be considered, such as vCPU and RAM as well.
+:::
+
+
+UI project quotas
+
+![Slide 330 diagram](images/slide_330_image_01.png){width="80%"}
+
+::: {.notes}
+The UI will allow you to display the project quotas, however, you can not change them. To change them, you will need to use the CLI.
+To display the panel shown here, Click Project > Compute > Overview.
+In this case, for the demo project the Nova (Compute) quota is unlimited for instances as it has been set to -1 from the CLI. The vCPUs quota is 20, and the RAM quota is 50GB.
+:::
+
+
+# Pre-Caching Images On Compute Nodes {.center}
+
+::: {.notes}
+This next section will go over how to pre-cache images on Nova compute nodes. This was a new feature with the Ussuri release.
+For more information about image caching, see the documentation on OpenStack.org.
+    https://docs.openstack.org/nova/latest/admin/image-caching.html
+:::
+
+
+During the typical deploy instance process, the image disk file must be copied from Glance to the compute node
+Note: The image could be located in the image repository or the image cache on the controller node
+Pre-caching images on compute nodes achieves lower time-to-boot latency when deploying instances
+The compute nodes must be part of a host aggregate
+When you pre-cache the image, you specify the host aggregate; the image is cached on all nodes within the host aggregate
+
+Image pre-caching
+
+332
+
+::: {.notes}
+During the typical deploy instance process, the image disk file must be copied from Glance to the compute node. Note that the image could be located in the image repository or the image cache on the controller node. Image pre-caching is the act of priming that cache with images ahead of time to improve performance of the first boot.
+Some of the virt drivers provide image caching support. Pre-caching images on compute nodes achieves lower time-to-boot latency when deploying instances because second-and-later boots of the base image are located in an on-disk cache. This avoids the need to re-download the image from Glance, therefore reducing network utilization and time-to-boot latency.
+To use pre-caching, the compute nodes must be part of a host aggregate. When you pre-cache the image, you specify the host aggregate. The image is then cached on all nodes within the host aggregate.
+:::
+
+
+Decreased load on the Glance server(s) Decreased network utilization
+Decreased time-to-boot latency for the second and subsequent instances
+
+Benifits of image pre-caching
+
+333
+
+::: {.notes}
+In summary, the benefits of image pre-caching are decreased load on the Glance server(s), decreased network utilization, and decreased time-to-boot latency for the second and subsequent instances.
+:::
+
+
+Define host aggregate called labAgg
+
+openstack aggregate create labAgg
+
+Add host (compute node) vlab to labAgg
+
+openstack aggregate add host labAgg vlab
+
+Add image to pre-cache on vlab using image ID
+
+nova aggregate-cache-images labAgg 1376a8fc-49a4-40a6-a9ac-0a98edbf9e3b
+
+Example: pre-caching an image
+
+334
+
+::: {.notes}
+Shown here are some of the commands involved in pre-caching an image. Note that image pre-caching requires the admin role. Also, image pre-caching happens asynchronously in a best-effort manner.
+To define a host aggregate called labAgg, use the command openstack aggregate create labAgg 
+To add host (or compute node) vlab to labAgg, use the command openstack aggregate add host labAgg vlab
+And to add image to pre-cache on vlab using image ID, use the command nova aggregate-cache-images labAgg with the indicated image ID.
+:::
+
+
+Defined in nova.conf:
+
+[image_cache]
+manager_interval = 2400 subdirectory_name = _base remove_unused_base_images = true
+remove_unused_original_minimum_age_seconds = 86400
+remove_unused_resized_minimum_age_seconds = 3600
+precache_concurrency = 1
+
+Image pre-caching configuration
+
+335
+
+::: {.notes}
+This information about image pre-caching configuration is provided for REFERENCE ONLY. The following default definitions can be found in the nova.conf file.
+manager_interval is the number of seconds to wait between runs of the image cache manager. In this case the default is 2400.
+subdirectory_name is the location of cached images, which is a sub-folder of the instances path. The default here is _base. An example from our lab environment is /opt/stack/data/nova/instances/_base
+Should unused base images be removed? If so, then be sure that remove_unused_base_images is set to the default of true.
+remove_unused_original_minimum_age_seconds establishes that unused base images younger than the minimum age in seconds will not be removed. The default is 86400 seconds, which is 24 hours.
+remove_unused_resized_minimum_age_seconds established that unused resized base images younger than the minimum age in seconds will not be removed. The default is 3600 seconds or one hour.
+precache_concurrency sets the maximum number of compute hosts to trigger image precaching in parallel. When an image precache request is made, compute nodes will be contacted to initiate the download. This number constrains the number of those that will happen in parallel (or simultaneously). The default is 1.
+:::
+
+
+# Migration Of Instances {.center}
+
+# Administrator Feature {.center}
+
+::: {.notes}
+This next section covers the migration of instances. This is an administrative feature.
+:::
+
+
+Moving an instance from one compute node to another
+Live migration: While running
+openstack server migrate –live
+The instance is paused very briefly near the end of the memory copy
+Non-live migration: Also known as cold migration, or simply migration
+openstack server migrate
+The instance is shut down, moved to another host, and restarted = disruptive
+Notes:
+Not all hypervisors support live migration or all of its features
+In a multi-cell cloud, instances can be live migrated to a different host in the same cell, but not across cells
+
+Instance migration overview
+
+337
+
+::: {.notes}
+Instance migration is simply moving an instance from one compute node to another. There are two types of migration. Non-live or cold migration and live migration.
+Non-live migration is also known as cold migration, or simply migration. The command for non-live migration is openstack server migrate . In a non-live migration, the instance is shut down, moved to another host, and restarted. Obviously, this is disruptive. For example, you might need to migrate all instances in a planned maintenance window.
+- Live migration is done while the instance is running.
+- The command for this is openstack server migrate --live .
+- In a live migration, near the end of the memory copy, the instance is paused for a short time so that the remaining few pages can be copied without interference from instance memory writes.
+- The Compute service initializes this time to a small value that depends on the instance size, typically around 50 milliseconds.
+- When it notices that the memory copy does not make sufficient progress, it increases the time gradually.
+Not all hypervisors support live migration or all of its features. Also, in a multi-cell cloud, instances can be live migrated to a different host in the same cell, but not across cells. If you are running VMware, you will need to enable vMotion on all ESX hosts which are managed by Nova instead.
+For more details, see OpenStack.org’s documentation on configuring migrations and resizing and cold migrations.
+https://docs.openstack.org/nova/ussuri/admin/configuring-migrations.html#section-configuring-compute-migrations 
+https://docs.openstack.org/nova/latest/contributor/resize-and-cold-migrate.html
+:::
+
+
+First, determine your compute nodes:
+
+Assume the instance is running on vlab and you want to move it to vlab2 :
+openstack server migrate <instance_ID> --live vlab2
+If the target host is not specified, Nova automatically chooses one
+
+Live migration steps
+
+338
+
+$ openstack compute service list
++--------------------------------------+----------------+------+----------+---------+-------+----------------------------+
+| ID                                   | Binary         | Host | Zone     | Status  | State | Updated At                 |
++--------------------------------------+----------------+------+----------+---------+-------+----------------------------+
+| e5f54ff8-3f95-4824-88c7-ff7629bc4e12 | nova-scheduler | vlab | internal | enabled | up    | 2025-07-28T23:14:41.000000 |
+| d9a58319-3cfb-49ed-9d65-57207ce2ce35 | nova-conductor | vlab | internal | enabled | up    | 2025-07-28T23:14:45.000000 |
+| 6ff44ff1-97ce-4f23-84b1-c1662cb3c036 | nova-conductor | vlab | internal | enabled | up    | 2025-07-28T23:15:16.000000 |
+| 3c988e00-f949-4669-aed6-ee5a485166ed | nova-compute   | vlab | nova     | enabled | up    | 2025-07-28T23:14:50.000000 |
++--------------------------------------+----------------+------+----------+---------+-------+----------------------------+
+
+::: {.notes}
+Here are the steps involved in a live migration.
+First, determine your compute nodes via the command openstack compute service list.
+Assume the instance is running on vlab and you want to move it to vlab2. To do so, use the command openstack server migrate <instance_ID> --live vlab2.
+Not that if the target host is not specified, Nova will automatically choose one.
+:::
+
+
+Currently (Ussuri release) it is not possible to migrate an instance from a host in one cell to a host in another cell.
+This may be possible in the future, but it is currently unsupported.
+This impacts cold migration, resizes, live migrations, evacuate, and unshelve operations.
+
+Cross-cell instance migrations
+
+339
+
+::: {.notes}
+In the Ussuri release that this course is based on, it is not possible to migrate an instance from a host in one cell to a host in another cell.
+This may be possible in the future, but it is currently unsupported.
+This impacts cold migration, resizes, live migrations, evacuate, and unshelve operations.
+Disclaimer:
+    https://docs.openstack.org/nova/ussuri/user/cellsv2-layout.html
+:::
+
+
+# Some Cli Commands {.center}
+
+::: {.notes}
+This next section will cover some OpenStack CLI commands that may be useful when configuring and troubleshooting.
+:::
+
+
+Display summary of resource usage for all instances running on a compute node (host):
+Demo project is highlighted
+
+Nova usage statistics
+
+341
+
+openstack server list --all-projects --host vlab --long
++-----------+--------+--------+------------+-------------+-----------+------------+-----------+---------+-------------------+------+------------+-------------+
+| ID        | Name   | Status | Task State | Power State | Networks  | Image Name | Image ID  | Flavor  | Availability Zone | Host | Properties | Host Status |
++-----------+--------+--------+------------+-------------+-----------+------------+-----------+---------+-------------------+------+------------+-------------+
+| e30a8e5a- | myVM-1 | ACTIVE | None       | Running     | shared=19 | cirros-    | 686464c9- | m1.tiny | nova              | vlab |            | UP          |
+| 1424-     |        |        |            |             | 2.168.233 | 0.6.2-     | acaf-     |         |                   |      |            |             |
+| 4306-     |        |        |            |             | .72       | x86_64-    | 4d0a-     |         |                   |      |            |             |
+| b3be-     |        |        |            |             |           | disk       | 8829-     |         |                   |      |            |             |
+| d81ecc6ea |        |        |            |             |           |            | cb486d5ca |         |                   |      |            |             |
+| 4dc       |        |        |            |             |           |            | 24f       |         |                   |      |            |             |
++-----------+--------+--------+------------+-------------+-----------+------------+-----------+---------+-------------------+------+------------+-------------+
+
+::: {.notes}
+The command openstack host show will display a summary of resource usage for all instances running on a compute node (host). The demo project is highlighted here.
+For more information, see the OpenStack.org documentation on nova-show-usage-statistics-for-hosts-instances.
+  https://docs.openstack.org/nova/ussuri/admin/common/nova-show-usage-statistics-for-hosts-instances.html
+:::
+
+
+Display compute resources for all projects (includes historical data):
+
+openstack usage list  --start <yyyy-mm-dd>  --end <yyyy-mm-dd>
+
+Nova usage statistics
+
+342
+
+::: {.notes}
+The command openstack usage list will display compute resources for all projects (includes historical data). The demo project is highlighted here.
+For more information, see the OpenStack.org documentation on nova-show-usage-statistics-for-hosts-instances.
+    https://docs.openstack.org/nova/ussuri/admin/common/nova-show-usage-statistics-for-hosts-instances.html
+:::
+
+
+Display Nova diagnostic statistics for an instance (myVM-1):
+
++
+
+|
+
+nova diagnostics myVM-1
++	+
+| Property	| Value
++	+
+
++
+
+| memory_details | {"maximum": 0, "used": 0}	|
+
+| [{"mac_address": "fa:16:3e:90:62:22", "rx_octets": 18788, "rx_errors": 0, |
+
+| "rx_drop": 0, "rx_packets": 194, "rx_rate": null, "tx_octets": 10202,	|
+| "tx_errors": 0, "tx_drop": 0, "tx_packets": 114, "tx_rate": null}]	|
+
+| nic_details
+|
+|
+| num_cpus
+
+| 0
+| num_disks	| 1
+| num_nics	| 1
+| state	| running
+| uptime	| 1900
+
+|
+|
+|
+|
+|
+
++
+
++
+
++
+
+Nova instance statistics
+
+343
+
+::: {.notes}
+The command nova diagnostics myVM-1 will display Nova diagnostic statistics for an instance (myVM-1).
+For more information, see the OpenStack.org documentation on nova-show-usage-statistics-for-hosts-instances.
+https://docs.openstack.org/nova/ussuri/admin/common/nova-show-usage-statistics-for-hosts-instances.html
+:::
+
+
+Display hypervisor details
+
+344
+
++---------------------+--------------------------------------+
+| Field               | Value                                |
++---------------------+--------------------------------------+
+| aggregates          | []                                   |
+| cpu_info            | None                                 |
+| host_ip             | 172.31.49.182                        |
+| host_time           | 23:50:54                             |
+| hypervisor_hostname | vlab                                 |
+| hypervisor_type     | QEMU                                 |
+| hypervisor_version  | 6002000                              |
+| id                  | 6630a151-0350-4984-a56f-4aba646ec042 |
+| load_average        | 0.54, 1.69, 1.60                     |
+| service_host        | vlab                                 |
+| service_id          | 3c988e00-f949-4669-aed6-ee5a485166ed |
+| state               | up                                   |
+| status              | enabled                              |
+| uptime              | 13 min                               |
+| users               | 2                                    |
++---------------------+--------------------------------------+
+
+openstack hypervisor show vlab
+
+::: {.notes}
+The command openstack hypervisor show will display hypervisor details.
+:::
+
+
+Display all compute resource providers:
+
+Placement CLI
+
+345
+
+openstack --os-placement-api-version 1.9 resource provider list
++--------------------------------------+------+------------+
+| uuid                                 | name | generation |
++--------------------------------------+------+------------+
+| 6630a151-0350-4984-a56f-4aba646ec042 | vlab |          3 |
++--------------------------------------+------+------------+
+
+::: {.notes}
+To display all compute resource providers, use the command openstack --os -placement -api-version 1.9 resource provider list 
+To display all compute resource inventories (or classes), use the command openstack --os -placement -api-version 1.9 resource class list 
+For an overview of the CLI commands, see the OpenStack.org documentation.
+    https://docs.openstack.org/osc-placement/ussuri/cli/index.html
+:::
+
+
+Placement CLI
+
+346
+
+Display all resource inventories (classes):
+
+openstack --os-placement-api-version 1.9\ resource class list
++----------------------------------------+
+| name                                   |
++----------------------------------------+
+| VCPU                                   |
+| MEMORY_MB                              |
+| DISK_GB                                |
+| PCI_DEVICE                             |
+| SRIOV_NET_VF                           |
+| NUMA_SOCKET                            |
+| NUMA_CORE                              |
+| NUMA_THREAD                            |
+| NUMA_MEMORY_MB                         |
+| IPV4_ADDRESS                           |
+| VGPU                                   |
+| VGPU_DISPLAY_HEAD                      |
+| NET_BW_EGR_KILOBIT_PER_SEC             |
+| NET_BW_IGR_KILOBIT_PER_SEC             |
+| PCPU                                   |
+| MEM_ENCRYPTION_CONTEXT                 |
+| FPGA                                   |
+| PGPU                                   |
+| NET_PACKET_RATE_KILOPACKET_PER_SEC     |
+| NET_PACKET_RATE_EGR_KILOPACKET_PER_SEC |
+| NET_PACKET_RATE_IGR_KILOPACKET_PER_SEC |
++----------------------------------------+
+
+::: {.notes}
+To display all compute resource providers, use the command openstack --os -placement -api-version 1.9 resource provider list 
+To display all compute resource inventories (or classes), use the command openstack --os -placement -api-version 1.9 resource class list 
+For an overview of the CLI commands, see the OpenStack.org documentation.
+    https://docs.openstack.org/osc-placement/ussuri/cli/index.html
+:::
+
+
+Display the usage data for the demo project:
+
+Placement CLI
+
+347
+
+openstack --os-placement-api-version 1.9 \ resource usage show \ 16d664c30c224995bc3ff2aa4e03afb2
++----------------+-------+
+| resource_class | usage |
++----------------+-------+
+| DISK_GB        |     1 |
+| MEMORY_MB      |   512 |
+| VCPU           |     1 |
++----------------+-------+
+
+::: {.notes}
+To display the usage data for the demo project, use the command openstack --os -placement -api-version 1.9 resource usage show <UUID> 
+To display detailed inventory data for the vlab provider, use the command openstack --os -placement -api-version 1.9 resource provider inventory list <UUID> 
+For an overview of the CLI commands, see the OpenStack.org documentation.
+    https://docs.openstack.org/osc-placement/ussuri/cli/index.html
+:::
+
+
+# Troubleshooting Cli Requests {.center}
+
+::: {.notes}
+This next section will be helpful in troubleshooting CLI requests.
+:::
+
+
+In many cases, you can troubleshoot an issue without looking at log files
+openstack CLI client supports a --debug option
+
+openstack --debug server create ...
+
+Displays API calls in the CLI
+Allows you to verify the following information:
+The request received a valid token
+The endpoints used for the request
+The syntax of the API calls for the request
+Correct resources are found (flavor, image, network, and so on)
+
+Troubleshooting CLI requests
+
+349
+
+::: {.notes}
+In many cases, you can troubleshoot an issue without looking at log files. The openstack CLI client supports a --debug option. Just use the command openstack --debug server create …
+This command displays API calls in the CLI, thus allowing you to verify whether the request received a valid token, the endpoints used for the request,the syntax of the API calls for the request, and whether the correct resources are found (meaning flavor, image, network, and so on).
+You can also use the --debug option to understand (and learn) the OpenStack REST API calls.
+:::
+
+
+Request token
+
+350
+
+::: {.notes}
+Using the --debug option displays a lot of data! Here we will focus on a subset of the data.
+In this situation, the OpenStack client is configured to use password authentication. The --debug option shows the GET request for a token, which you can see highlighted in yellow.
+:::
+
+
+Token received
+
+351
+
+::: {.notes}
+Here we can see that a valid token was generated and received, as shown by the HTTP 201 response. Based on the difference between “expires_at” and “issued_at”, we know that the token is valid for an hour. The Service Catalog endpoints are included in the response, such as the Keystone public and admin URLs.
+:::
+
+
+Validate image
+
+352
+
+::: {.notes}
+Perhaps there is an issue with validating the image. Here we can see that the GET for cirros-0.4.0-x86_64-disk yields a 404 because the image name was used, not the ID.
+The second GET is slightly different. Notice it specifies the name parameter in the request.
+:::
+
+
+Validate flavor
+
+353
+
+::: {.notes}
+The problem might be with validating the flavor. This section of the --debug output shows that the GET request for m1.tiny yields a 404 because the flavor name was used, not the ID.
+The second GET request retrieves a list of all flavors to determine the ID for the m1.tiny flavor. Finally, a GET request retrieves the flavor details for the m1.tiny flavor, using its ID (1).
+:::
+
+
+Validate network
+
+354
+
+::: {.notes}
+The network information might be wrong. Here we see that the GET request for the private network yields a 404 response because the network name was used, not the ID.
+The second GET retrieves a list of all networks to determine the ID for the private network and its data.
+:::
+
+
+Start create server process
+
+355
+
+::: {.notes}
+You may need to confirm whether the create server process was started. This slide shows that the POST request creates the instance. Immediately after the POST, a GET request is issued to validate the instance is booting as evidenced by status=BUILD.
+At this point, Nova also knows the ID of the instance which is highlighted in yellow.
+:::
+
+
+In general, using names for flavor, image, network, and so on, yield additional API calls to determine the ID of the resource
+However, using IDs is more cumbersome, error prone (typos), and confusing
+
+Troubleshooting summary
+
+356
+
+::: {.notes}
+In general, using names for flavor, image, network, and so on, require additional API calls to determine the ID of the resource. However, using IDs is more cumbersome, error prone due to typos, and confusing.
+:::
+
+
+DISCUSSION: IS KVM A HYPERVISOR?
+
+# (Optional Content) {.center}
+
+::: {.notes}
+This next section goes over the question, “Is KVM a hypervisor?” It is an optional section.
+:::
+
+
+# Is Kvm A Hypervisor? {.center}
+
+![Slide 358 diagram](images/slide_358_image_01.jpg){width="80%"}
+
+::: {.notes}
+Although it is commonly considered to be one, KVM is not in fact a hypervisor. Instead, KVM provides hardware acceleration for virtualized environments.
+When people say that KVM is their hypervisor, they mean that they are also running quick emulator (or QEMU). QEMU provides the actual hypervisor functions. Likewise, libvirt provides Tools to deploy VMs to hypervisors, such as QEMU.
+KVM requires that QEMU and libvirt are also installed. The three products work together to provide the hypervisor environment.
+The nova-compute process interfaces with libvirt.
+:::
+
+
+# Is Kvm A Hypervisor? {.center}
+
+![Slide 359 diagram](images/slide_359_image_01.jpg){width="80%"}
+
+::: {.notes}
+libvirt provides the management tools to deploy and manage instances on QEMU. libvirt is open source software that provides management APIs, libvirtd daemon, and tools via virsh to manage virtualized resources. libvirt supports multiple different hypervisors, and therefore KVM needs libvirt to manage the VMs.
+:::
+
+
+# Is Kvm A Hypervisor? {.center}
+
+![Slide 360 diagram](images/slide_360_image_01.jpg){width="80%"}
+
+::: {.notes}
+QEMU provides the actual hypervisor functions, hosting instances. QEMU is a software-only machine emulator and virtualizer in user space. It emulates different hardware and makes use of KVM for hardware acceleration when the target architecture is the same as the host architecture. QEMU can run standalone or with KVM and Xen.
+:::
+
+
+# Is Kvm A Hypervisor? {.center}
+
+![Slide 361 diagram](images/slide_361_image_01.jpg){width="80%"}
+
+::: {.notes}
+In addition KVM provides hardware acceleration. virtio provides a better performing I/O framework. KVM requires QEMU to add and delete VM instances, create VM disks, take snapshots, and emulate processors.
+:::
+
+
+SUMMARY
+
+::: {.notes}
+Before you start the lab exercises, take a moment to review what we covered in this module.
+:::
+
+
+You should now be able to:
+Explain the role of each Nova process
+nova-api
+nova-scheduler
+nova-conductor
+nova-compute
+Describe the KVM hypervisor architecture List other supported hypervisors
+Describe quotas: how to set them & how they can affect you Use the CLI and UI to deploy instances
+
+SUMMARY
+
+363
+
+::: {.notes}
+At this point, you should be able to explain the role of each Nova process, including nova-api, nova-scheduler, nova-conductor, and nova-compute; describe the KVM hypervisor architecture; list other supported hypervisors; describe quotas including how to set them and how they can affect your workflows; and use the CLI and UI to deploy instances.
+:::
+
+
+EXERCISES
+
+364
+
+Work through the following lab in the exercise book:
+Lab: Compute service (Nova)
+
+![Slide 364 diagram](images/slide_364_image_01.png){width="80%"}
+
+::: {.notes}
+Work through the Nova Compute service lab in the exercise book.
+:::
+
+

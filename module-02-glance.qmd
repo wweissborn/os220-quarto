@@ -1,0 +1,1173 @@
+---
+title: "Module 2: Glance"
+subtitle: "OS220: OpenStack Image Service"
+format:
+  pptx:
+    reference-doc: ./template.pptx
+    highlight-style: tango
+    slide-level: 2
+---
+
+# Glance - Image Service
+
+::: {.notes}
+
+[pause 1.0s]
+
+In this unit, we'll take a look at Glance, OpenStack's image service. Glance enables users
+to store and retrieve virtual machine images in the image repository. You can store virtual
+machine images in a variety of locations, from simple file systems to object storage systems like
+OpenStack Object Storage known as Swift.
+
+[pause 0.5s]
+
+Optionally, you can define image metadata. For example, you might have a particular image that
+should only be used on a KVM hypervisor, meaning not VMware or other hypervisors. This unit
+discusses Glance, including the use of metadata, the image repository, plus guidelines on
+building images.
+
+:::
+
+
+## Objectives - Glance
+
+At the end of this presentation, you should be able to:
+
+- Explain what an image is
+- Import images to Glance
+- List as many backends (as you can) for the image repository
+- Understand the pros and cons of building a custom image
+- Explain the purpose of image metadata
+
+::: {.notes}
+
+[pause 1.0s]
+
+At the end of this presentation, you should be able to explain what an image is, import images to
+Glance, list as many backends as you can for the image repository, understand the pros and cons
+of building a custom image, explain the purpose of image metadata.
+
+[pause 0.5s]
+
+After this lecture, you might wish to read the Glance Image Guide which is available on the
+OpenStack documentation website.
+
+:::
+
+
+## Glance - Deploy an Instance (1)
+
+![As previously seen in the Keystone module](images/VMRequestReview.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Let's step back and look at the diagram of the deploy instance flow started in the Keystone
+module.
+
+:::
+
+
+## Glance - Deploy an Instance (2)
+
+![Request Token Authentication](images/RequestTokenAuthentication.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Glance, depicted by the blue storage icon, is involved in two parts of the deploy instance flow.
+First, the nova-api service send the request, with the authorization token, to glance.
+
+Glance is involved in two ways when and instance is requested. First, the nova-api sends the request, the token, and image info to glance.  Glance then validates the request, via keystone.
+
+:::
+
+
+## Glance - Deploy an Instance (3)
+
+![Second step of instance instantiation](images/2ndStepInstanceRequest.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Once nova is informed that the token is valid, it then goes back to glance to make sure the requested image exists and is accessible.
+:::
+
+
+## Glance - Deploy an Instance (4)
+
+![Image is retrieved prior to booting instance](images/2ndStepInstanceRequest.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Having confirmed the requested image exists, nova-api then passes the request onto nova-compute.
+Nova-compute now actually retrieves the image from glance in preperation of booting the requested image.
+
+[pause 0.5s]
+
+Now that you know where Glance fits into the overall deploy instance flow, let's go deeper into
+Glance itself.
+
+:::
+
+
+
+# Glance - Image Service Overview
+
+::: {.notes}
+
+[pause 1.0s]
+
+This next section will give a brief overview of the architecture of Glance.
+
+:::
+
+
+## Architecture
+
+![](images/slide_126_image_01.jpg)
+
+::: {.notes}
+
+[pause 1.0s]
+
+As you can see, Glance has several main components. The glance-api accepts image API calls for
+image creation and storage, update, and retrieval. It also stores, processes, and retrieves image
+metadata, such as size, type, hypervisor, and so on.
+
+[pause 0.5s]
+
+The Glance database stores image details, as well as, the image metadata. The image repository is
+a storage repository that stores the actual image disk files. As shown in the graphic, those
+images can be found on many different repositories such as the local filesystem, Swift, Sheepdog,
+Cinder, Amazon S3, Ceph (rbd), VMware datastore, and other.
+
+[pause 0.5s]
+
+There are also several periodic processes running on Glance to support internal caching.
+
+:::
+
+
+## Glance Overview
+
+- Provides images used in the deployment of VMs
+- Supports multiple backends for image storage (repository)
+  - Can store the same image in multiple locations.
+- Supports multiple image formats
+- Supports image metadata (properties)
+  - For example, identifying image as a Linux image. The image would not be listed for a Windows
+    deployment.
+
+::: {.notes}
+
+[pause 1.0s]
+
+Glance provides images used in the deployment of VMs. It supports multiple backends for image
+storage or repository, and it can store the same image in multiple locations. Glance supports
+multiple image formats as well as image metadata or properties, for example, identifying an image
+as a Linux image. The image would not be listed for a Windows deployment.
+
+[pause 0.5s]
+
+The functionality provided by the different backends is not 100% similar. The exact Glance
+capabilities available depend on the backend and Hypervisor used. Most of the features are
+developed and tested with the file system or Swift.
+
+[pause 0.5s]
+
+OpenStack does not use image metadata. However, you can define additional properties on an image,
+such as hypervisor type, OS type, and more. This metadata can be used by other components to
+build on a specific hypervisor or some other customized workflows using heat or other
+orchestration services.
+
+:::
+
+
+# Glance Images - What are they?
+
+::: {.notes}
+
+[pause 1.0s]
+
+This next section will go into more detail about what an OpenStack Glance image is, image
+metadata and how to use it, image formats, how to build images including converting from one
+format to another, and how to create custom images.
+
+:::
+
+
+## What is an Image?
+
+- Single file which contains a virtual disk that has a bootable operating system installed
+  - Includes all the partition information, boot sectors, the file allocation table, operating
+    system installation and application software
+  - Optionally, might contain additional software, such as, an HTTP server, database, and so on
+  - Can also install software at boot time (requires cloud-init)
+- Required to deploy VM instances
+- Images can be downloaded from trusted Web sites or you can build your own
+- Must be imported to Glance image repository
+
+::: {.notes}
+
+[pause 1.0s]
+
+First off, what is a Glance image? A Glance image is a single file containing a virtual disk with
+a bootable operating system. These images are used in the deployment of virtual machine
+instances. An image includes all the partition information, boot sectors, the file allocation
+table, operating system installation and application software.
+
+[pause 0.5s]
+
+The image might also contain additional software that gets installed at boot time, such as an
+HTTP server, database, and so on. If it does, the software is baked into the image using
+cloud-init.
+
+[pause 0.5s]
+
+Images are required to deploy VM instances. They can be downloaded from trusted Web sites or you
+can build your own. You can create your own images or you can download images from several vendor
+provided web sites.
+
+[pause 0.5s]
+
+In either case, you must import the image to the Glance image repository using the openstack
+image create command or its equivalent from the UI. When the image is imported, its image
+metadata is stored in the OpenStack database, for example MySQL.
+
+:::
+
+
+## Image Creation Example
+```bash
+$  openstack image create <image name> \
+   --disk-format qcow2 \
+   --file <image_disk_file>.img
+
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+This example is showing only the most basic of qualifiers needed to build an image. Check the
+documentation for a complete list.
+
+:::
+
+## Image Metadata
+
+Provides information about the virtual disk stored by the image service
+
+- E.g.: architecture, hypervisor type, virtual machine node, os-distro, etc.
+
+Can be used to influence the Nova scheduling process
+
+- Requires the Nova filter, ImagePropertiesFilter to be enabled
+
+Hypervisor types currently available:
+
+- hyperv
+- ironic
+- lxc
+- qemu (used for both QEMU & KVM)
+- uml
+- vmware, Xen
+
+::: {.notes}
+
+[pause 1.0s]
+
+Image metadata is essentially the image properties. The metadata provides information about the
+virtual disk stored by the Image service such as architecture, hypervisor type, virtual machine
+mode, os-distro, and more.
+
+[pause 0.5s]
+
+Image metadata can be used to influence the Nova scheduling process. This requires that the Nova
+ImagePropertiesFilter is enabled. For example, for hypervisor_type property, you can specify
+Hyperv, Ironic, lxc, qemu (which is used for both QEMU and KVM), uml, vmware, and xen. This would
+then limit the image use to a specific hypervisor.
+
+[pause 0.5s]
+
+See the OpenStack documentation on useful image properties for more information about Image
+metadata.
+
+:::
+
+
+## Metadata Example
+
+Import a Cirros image to Glance
+```bash
+ $ openstack image create cirros40 --disk-format qcow2 \
+    --container-format bare \
+   --file cirros-0.4.0-x86_64-disk.img
+```
+Define the image for use with QEMU only
+```bash
+ $ openstack image set --property hypervisor_type=qemu \
+    cirros40
+```
+Display image details:
+```bash
+ $ openstack image show cirros40
+
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here we see an example of using metadata in the creation of an image. To import a Cirros image to
+Glance, you need to use the openstack image create command. The full command in this example is
+shown here. We can see the image is named, the format is declared, the container format is
+declared, and the filename is specified.
+
+[pause 0.5s]
+
+In this example, the hypervisor type has been declared as QEMU whenever the cirros40 image is
+selected. As a result, all cirros40 images will end up on QEMU hypervisors. All non-QEMU
+hypervisors will be ignored, such as VMware. This occurs because metadata was used to define the
+image.
+
+[pause 0.5s]
+
+In this case, we declared QEMU as the hypervisor_type. Assuming the Nova ImagePropertiesFilter is
+enabled, whenever the cirros40 image is used to deploy an instance, only QEMU hypervisors will be
+selected by Nova. Essentially, Nova only looks at the metadata if the ImagePropertiesFilter is
+enabled.
+
+[pause 0.5s]
+
+For more information on how to use metadata, see the OpenStack documentation on Useful Image
+Properties.
+
+:::
+
+
+## Image Properties
+
+![CLI Command: openstack image show <image name or ID>](images/ImagePropertiesOutput.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+This is the output of the openstack image show properties command. Note the contents of the
+circled text, specifically the properties line.
+
+:::
+
+
+## Disk formats:
+
+- Raw (Unstructured disk image format) qcow2 (QEMU Copy On Write)
+- Can expand dynamically iso (Optical Disk)
+- Vmdk (Common disk format supported by VMware and others)
+- Vdi (Supported by VirtualBox virtual machine monitor and the QEMU emulator)
+- Vhd (common disk format used by VMware, Xen, Microsoft, VirtualBox, and others)
+- Vhdx (enhanced version of the VHD format, which supports larger disk sizes among other
+  features) ploop (used by Virtuozzo to run OS Containers) aki, ari, ami (Amazon EC2)
+- Aki, ari,ami (Amazon EC2)
+
+::: {.notes}
+
+[pause 1.0s]
+
+When you create an image, Glance imports the image file to the image repository, for example,
+Swift or the local file system. Glance creates the image metadata in the metadata repository
+(database). The Image metadata comes from the openstack image create command parameters.
+
+[pause 0.5s]
+
+Raw is an unstructured disk image format. Note that raw images do not support snapshots. Qcow2 or
+QEMU Copy On Write can expand dynamically. This disk image format uses the copy-on-write
+technique to reduce disk image size. The original storage is never modified. When a write request
+is made, it is redirected away from the original data into a new storage area.
+
+[pause 0.5s]
+
+Iso is an optical Disc. Vmdk stands for virtual machine disk. VMDK is a common disk format
+supported by VMware and others. Vdi stands for virtual disk image. VDI is supported by VirtualBox
+virtual machine monitor and the QEMU emulator. None of the OpenStack Compute hypervisors support
+VDI directly, so you will need to convert these files to a different format to use them with
+OpenStack.
+
+[pause 0.5s]
+
+Vhd stands for virtual hard disk. VHD is a common disk format used by VMware, Xen, Microsoft,
+VirtualBox, and others. Vhdx is an enhanced version of the VHD format. It supports larger disk
+sizes among other features. Ploop is used by Virtuozzo to run OS Containers.
+
+[pause 0.5s]
+
+Aki, ari, and ami are Amazon EC2 images. AKI stands for Amazon kernel image. ARI stands for
+Amazon RAMdisk image. And AMI stands for Amazon machine image. These are sometimes packaged as a
+Ubuntu Enterprise Cloud or UEC tarball, however support for that is deprecated in later releases.
+
+:::
+
+
+## Container formats
+Containers Formats:
+
+- Bare (no container or metadata envelope) docker (Docker container format)
+- Ovf (open virtualization format)
+- Ova (An OVF package in a tarfile)
+- Compressed (exact format not specified)
+- Any OpenStack service that creates an image with a 'compressed' container format will be able
+  to consume that image
+
+::: {.notes}
+
+[pause 0.5s]
+
+Container formats contain metadata. They include bare, which means there is no container or
+metadata envelope. Docker, which is the Docker container format. Ovf, or the open virtualization
+format. Ova, which is an OVF package in a tarfile.
+
+[pause 0.5s]
+
+Compressed, in which case the exact format is not specified. Any OpenStack service that creates
+an image with a compressed container format will be able to consume that image. And aki, ari, and
+ami, which again are Amazon EC2 formats.
+
+[pause 0.5s]
+
+Filename extensions for images are .img for raw images of hard drive disks and .ovf for disk
+images that are compliant with OVF container formats. Glance supports a wide range of disk
+formats.
+
+[pause 0.5s]
+
+You can also use tools, such as VBoxManage or qemu-image convert, to convert between the
+supported formats.
+
+:::
+
+
+## Filename Extensions
+
+Filename extensions:
+
+- .img (raw images of hard drive disks)
+- .ovf (disk image compliant with OVF container format. Supports a wide range of disk formats.)
+
+
+## Cloud-Ready Images for Download (1)
+
+Centos
+
+- http://cloud.centos.org/centos/6/
+- http://cloud.centos.org/centos/7/
+- https://cloud.centos.org/centos/8/
+
+Cirros
+
+- http://download.cirros-cloud.net/
+
+Debian
+
+- http://cdimage.debian.org/cdimage/openstack/
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+The simplest way to obtain a virtual machine image that works with OpenStack is to download one
+from a vendor-provided web site. Most, not all, of the images shown here contain the cloud-init
+package to support the SSH key pair and user data injection. Many vendors provide websites where
+you can download images. This slide lists the most common web pages to use for image downloads.
+
+[pause 0.5s]
+
+For more details about how to obtain images, see the OpenStack Image Guide. You may also access
+the images directly from the links provided here. Please note that older releases are still
+present and available for academic or reference purposes, but they are considered unsafe to use.
+
+:::
+
+
+## Cloud-Ready Images for Download (2)
+
+Windows
+
+- https://cloudbase.it/windows-cloud-src/images/
+
+Ubuntu
+
+- https://cloud-images.ubuntu.com/
+
+OpenSUSE
+
+- https://software.opensuse.org/distributions/leap#JeOS-ports
+- https://www.suse.com/download/sles/
+
+Red Hat Enterprise Linux
+
+- https://software.opensuse.org/distributions/leap#JeOS-port
+- https://www.suse.com/download/sles/
+
+## Cloud-Ready Images for Download (3)
+
+Fedora
+
+- https://alt.fedoraproject.org/cloud/
+
+FreeBSD, OpenBSD, and NetBSD
+
+- https://bsd-cloud-image.org/
+
+::: {.notes}
+
+[pause 1.0s]
+
+Please check the documentation for any release you are considering. Many distributions include an
+LTS release. This stands for Long Term Support and these images are supported by the manufacturer
+for longer periods of time. These images should be considered if using those distributions.
+
+:::
+
+
+## Building Images - Manual vs Tools
+
+Manual Process--Tedious
+
+- Create VM
+- Install operating system
+- Start VM with ISO connected as CD-ROM
+- Connect to VM via VNC console or SPICE
+- Install O.S. as you would normally
+- Install and configure cloud-init or cloudbase-init (depending on OS)
+- install virtIO drivers (Win only)
+- Continue on OR Pick a Tool
+
+
+## Building Imaages - Manual vs Tools
+
+Tools Process - Usually more Efficient
+
+- Diskimage builder
+- Oz
+- VeeWee
+- Packer
+- Image-bootstrap
+- Imagefactory
+- KIWI
+- SUSE Studio
+- virt-builder
+
+::: {.notes}
+
+[pause 1.0s]
+
+If you need to create a custom image, you can do it yourself or you can use a tool, such as the
+ones listed on the slide. Building an image yourself is a manual, tedious process.
+
+[pause 0.5s]
+
+To do so, you start by creating a VM using qemu-img create. You then install an operating system.
+This process requires that you start the VM with ISO connected as CD-ROM or DVD, and for that you
+will need the installation ISO file for the guest operating system.
+
+[pause 0.5s]
+
+Then you connect to VM via VNC console or SPICE, install Operating System as you normally would,
+install and configure cloud-init for Linux or cloudbase-init for Windows, and for Windows only
+you need to install virtIO drivers. You will also need access to a virtualization tool. You can
+use KVM for this. Or, if you have a GUI desktop virtualization tool (such as, VMware Fusion or
+VirtualBox), you can use that instead.
+
+[pause 0.5s]
+
+You then keep going with this process until you have created the image you need. Tools automate
+the disk image creation process by supporting a variety of distributions and architectures. Tools
+include Diskimage-builder, Oz, VeeWee, Packer, Image-bootstrap, Imagefactory, KIWI, SUSE Studio,
+virt-builder. Check each tool for details on what they support.
+
+
+:::
+
+
+## Building Images - Tips
+
+- Tip - DO NOT hard code MAC addresses
+  - Use virt-sysprep (Linux) or sysprep.exe (Windows)
+- Tip - Remove network persistence rules
+- Tip - Disable firewall
+- Tip - Install SSH server, configure to start at boot
+- Tip - Install cloud-init
+- Tip - Install any additional software (e.g.: Apache, MySQL, etc.)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Guidelines for building images are provided here. Notice the use of cloud-init. When you create a
+Linux image, you must decide how to partition the disks. The choice of partition method can
+affect the resizing functionality.
+
+[pause 0.5s]
+
+You should not hard-code MAC addresses. Instead, use virt-sysprep for Linux distros or sysprep
+dot exe for Windows.
+
+[pause 0.5s]
+
+You must remove the network persistence rules in the image because they might cause the network
+interface in the instance to come up as an interface other than eth0.
+
+[pause 0.5s]
+
+In general, OpenStack recommends that you disable any firewalls inside of your image and use
+OpenStack security groups to restrict access to instances.
+
+[pause 0.5s]
+
+Install SSH server, configure to start at boot. You must install an ssh server into the image and
+configure it to start up on boot. If you do not, you will not be able to connect to your instance
+using ssh when it boots inside of OpenStack.
+
+[pause 0.5s]
+
+The typical way that users access virtual machines running on OpenStack is to ssh using public
+key authentication. For this to work, your virtual machine image must be configured to download
+the ssh public key from the OpenStack metadata service or config drive, at boot time.
+
+[pause 0.5s]
+
+Install cloud-init. Install additional software such as Apache, DB, etc. And convert image to a
+different format if desired using qemu-img convert.
+
+:::
+
+
+## Converting Between Formats
+
+What if you have a vmdk image but need a qcow2 image for your app?
+
+You Convert!!
+
+qemu-img convert supports conversion between multiple formats, including qcow2, qed, raw, vdi,
+vhd, and vmdk
+
+For example, to convert from a vmdk format to qcow2
+
+- qemu-img convert -f vmdk -O qcow2 myimage.vmdk new-image.qcow2
+
+::: {.notes}
+
+[pause 1.0s]
+
+One tool for converting between image formats is qemu-img convert. This tool supports conversion
+between multiple formats, including qcow2, qed, raw, vdi, vhd, and vmdk.
+
+[pause 0.5s]
+
+For example, if you needed to to convert from a vmdk format to qcow2, you could use the command
+shown: qemu-img convert -f vmdk -O qcow2 myimage.vmdk new-image.qcow2
+
+[pause 0.5s]
+
+In addition to qemu-img convert, you can also use VBoxManage to convert from a VDI or VirtualBox
+to a raw format.
+
+:::
+
+
+## Custom Images
+
+Custom images might include pre-installed/pre-configured software
+
+- Advantages
+  - Boots faster - no need to download and install anything at boot time
+  - Boot reliability - Eliminates download failures due to transient network failures OR
+    inconsistent software repositories
+  - Tested - image updates verified in test environment BEFORE deployment to production
+    - It is possible some post-boot configuration may be required
+      - E.G.: define the IP addr and port of a DB server
+
+::: {.notes}
+
+[pause 1.0s]
+
+For custom images, you might hear the term that software is baked into the image. What this means
+is that the software is installed and customized in the image. Custom images might include
+pre-installed and or pre-configured software.
+
+[pause 0.5s]
+
+If you choose to build custom images, consider the pros and cons. For example, the VMs will boot
+more quickly because there is no need to download and install anything at boot time.
+
+[pause 0.5s]
+
+Another advantage to custom images is boot reliability from the elimination of download failures
+due to transient network failures or inconsistent software repositories. Additionally, image
+updates can be verified in test environments before deployment in production. There will be no
+configuration dependencies, although some post-boot configuration may be required, for example if
+you need to define the IP address and port of the database server.
+
+
+:::
+
+## Custom Images
+
+Disadvantages
+
+  - Image sprawl
+  - Can require additional storage
+  - Loss of flexibility - inability to override configurations
+
+::: {.notes}
+
+There are disadvantages to using custom images. Suppose you need to update database software in
+the image. You must rebuild the image and retest it. More than likely you still need the old
+image. Now, you have multiple images.
+
+[pause 0.5s]
+
+For example, imagine you need to make an update to the HTTP server in the same image. You have to
+create another image. Creating new images that are very similar to existing images creates an
+unmanageable scenario known as image sprawl.
+
+[pause 0.5s]
+
+In addition to management challenges, image sprawl consumes more storage and is less flexible
+because you cannot override any configuration.
+
+:::
+
+
+## Image Customization with cloud-init
+
+- Linux package, written in Python
+- Should be included in all images
+  - Included in many cloud-ready images
+- Provides boot time customization at initial boot, such as:
+  - Configure additional disks
+  - Run scripts/shell-commands
+  - Manage pkgs and repos
+  - Install and configure software
+  - Create users
+  - Add interface(s)
+  - Define SSH keys and more!
+
+::: {.notes}
+
+[pause 1.0s]
+
+Next, let's look at OpenStack Heat and exploiting cloud-init when customizing instances.
+Cloud-init is a piece of software created to help with initializing virtual machines on multiple
+different cloud software platforms. It is a collection of Python scripts that run on a VM's first
+boot. Cloud-init should be included in all images and is included in many cloud-ready images.
+
+[pause 0.5s]
+
+Cloud-init provides boot time customization of a VM instance at initial boot in order to
+configure additional disks, run scripts or commands, manage packages and repositories, install
+and configure software, create users, add an interface, define SSH keys, and much more!
+
+[pause 0.5s]
+
+Examples of what you can do with cloud-init can be found on the Cloud-init documentation website.
+Please note that cloud-init is not an OpenStack technology. Rather, it is a package that is
+designed to support multiple cloud providers, so that the same virtual machine image can be used
+in different clouds without modification.
+
+[pause 0.5s]
+
+Cloudbase-init is the equivalent package for Windows based VMs. It provides tools for Windows
+guest customization, such as user creation, password injection, hostname customization, SSH
+public keys and user-data scripts.
+
+:::
+
+
+
+# Importing Images to Glance
+
+::: {.notes}
+
+[pause 1.0s]
+
+In this next section, we will cover importing images to the Glance image repository.
+
+:::
+
+
+## UI: Image Create
+
+![ ](images/UIScreenshotforCreatingImages.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here is a screenshot of Glance's user interface for creating images. As you can see, you can
+specify an image to upload to the Image Service, indicate the format, and indicate other
+qualities such as the kernel, RAMdisk, architecture, minimum disk size, and minimum memory
+allocation.
+
+[pause 0.5s]
+
+You can also specify whether the image is private, shared, or community and whether it is
+protected or not with encryption.
+
+:::
+
+
+## Image Source
+
+File:
+
+- Image disk file that exists on local machine
+
+URL:
+
+- Image disk file exists on controller node serviced by Apache
+  - E.G.: http://127.0.0.1:8090/cirros-0.4.0-x86_64.img
+- Image disk file exists on external server
+  - E.G.: http://edu.mirantis.com/cloud-src/images/cirros-0.4.0-x86_64-disk.img
+
+![ ](images/UIImageSourceForm.jpg){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+Under Image Source, you can specify whether the image source file is a disk file that exists on a
+local machine or whether it can be obtained from a URL. External image disk files can exist on a
+controller node serviced by Apache or on an external server.
+
+:::
+
+
+## Image Requirements
+
+- Kernal: AKI (Amazon Kernal Image) file associated with AMI image
+- Ramdisk: ARI (Amazon RAM Image) file assocated with AMI
+- Architecture: Defines the type of image such as, x86_64
+- Minimum Disk: Minimum amount of disk-space, in GB, that is required to boot the image
+- Minimum Ram: Minimum amount of RAM, in MB, required to boot the image
+
+![ ](images/UIImageRequirementsForm.jpg){width="60%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+Under Image requirements you may specify several things. You may indicate which AKI or Amazon
+Kernel Image file is associated with an AMI image under kernel. Along similar lines, you can
+specify which ARI or Amazon RAM Image file is associated with that AMI image. Architecture
+defines the type of image, such as an x86_64 image. The architecture setting is optional. It can
+also be specified as image metadata.
+
+[pause 0.5s]
+
+Minimum Disk and Minimum RAM allow you to set the minimum amount of disk space in gigabytes and
+the minimum amount of RAM in megabytes that is required to boot the image.
+
+[pause 0.5s]
+
+If minimum disk or minimum RAM are 0 (zero), the size specified in the flavor is used. If minimum
+disk or minimum RAM are specified in the image, you must choose a flavor whose values are greater
+than or equal.
+
+[pause 0.5s]
+
+For example, if you specify a minimum disk size of 4GB, by default, you must choose the
+m1.medium, or larger, flavor.
+
+:::
+
+
+## Image Sharing
+
+Visibility
+
+- Public - Applicable to all users; shown in default image list
+- Private - Owned by the user and shown in default image list
+- Shared - Available for use by multiple projects
+- Community - Shared with all users
+
+![ ](images/UIImageSharingForm){width="45%"}
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+The Image Sharing section allows you to set the visibility and protection for your image. Private
+is only available for use by the current project.
+
+[pause 0.5s]
+
+Shared images are available for use by multiple projects and you can define who has access to the
+image. Some terminology you might see regarding shared images are producer and consumer. Producer
+refers to the person who creates the image or essentially the owner of the image. A consumer is a
+user who would like to use the image.
+
+[pause 0.5s]
+
+The producer can share the image with the consumer by making the consumer a member of that image.
+The consumer must accept membership before it will be included in the consumer's image list.
+Community images are shared with all users. If they are public, then all projects can use the
+image. This is an admin only function.
+
+[pause 0.5s]
+
+Setting the Protected status to Yes will prevent an image from being deleted. No will allow the
+image to be deleted. No is the default.
+
+[pause 0.5s]
+
+For more information on this topic, refer to the OpenStack documentation on sharing or the
+specs.openstack.org documentation on sharing-image-api-v2.
+
+:::
+
+
+## Image Create - Metadata (1)
+
+List retrieved from Glance Metadata Catalog
+
+![ ](images/UIImageMetadataForm.jpg){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+You can also specify resource metadata by moving items from the Available Metadata column to
+Existing Metadata. The column on the left contains metadata definitions from the Glance Metadata
+Catalog. You can use the Custom option to add metadata with the key of your choice.
+
+:::
+
+
+## Image Create - Metadata (2)
+
+Once the metadata has been chosen, options(if available) can be chosen from the dropdown
+
+![ ](images/UIImageMetadataOptionsDropdownForm.jpg){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here is an example of how you might specify a particular type of hypervisor using the dashboard
+UI. First you add the Hypervisor Selection option hypervisor_type.
+
+:::
+
+
+## Image Create - Metadata (3)
+
+![ ](images/UIImageMetadataOptionsDropdownChoices.jpg){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+Then you select which type of hypervisor you want from this pull-down menu.
+
+:::
+
+
+# Other Topics
+
+::: {.notes}
+
+[pause 1.0s]
+
+This next section will address other topics such as image compression, Glance image repository
+notes, and Glance image cache.
+
+:::
+
+
+## Image Compression
+
+Some images might be compressed before you import them to Glance
+
+Requires a plug-in to decompress the image
+
+- Defined in glance-image-import.conf:
+- image_import_opts]
+- image_import_plugins = ['image_decompression']
+
+Supported archive types zip, lha/lzh, and gzip
+
+::: {.notes}
+
+[pause 1.0s]
+
+Some images might be compressed before you import them to Glance. This is defined in
+glance-image-import.conf as shown here. Supported types are zip, lha, lzh, and gzip.
+
+[pause 0.5s]
+
+If you compress an image, a plug-in is required to decompress it. The plugin will not decompress
+images whose container_format is set to compressed to maintain the original intent of the image
+creator.
+
+[pause 0.5s]
+
+For more details on image compression, refer to the OpenStack documentation.
+
+:::
+
+
+## Notes on Glance Image Repository
+
+Glance supports multiple image repositories
+
+Defined in glance-api.conf
+
+- E.g.: 3 stores (local FS, external server (http), swift)
+- [glance_store]
+- stores = file, http, swift default_swift_reference = ref1
+- swift_store_config_file = /etc/glance/glance-swift-store.conf swift_store_auth_insecure = True
+- swift_store_create_container_on_put  = True
+- default_store = swift
+- filesystem_store_datadir  =  /opt/stack/data/glance/src/images/
+
+*filesystem_store_datadir defines directory in local FS
+
+::: {.notes}
+
+[pause 1.0s]
+
+Glance supports multiple image repositories. These are defined in the glance-api.conf file. Here
+is an example with three stores - a local filesystem, an external HTTP server, and Swift.
+
+[pause 0.5s]
+
+Filesystem_store_datadir defines directory in local FS. Support for multiple repositories can
+also be implemented per OpenStack's documentation on multiple image repositories, also known as
+multistores.
+
+:::
+
+
+## Optional Image Cache (1)
+
+- Local image cache stores copy of image files
+- Enables multiple API servers to serve the same image file; improving performance and
+  scalability
+  - Stores image files in local filesystem
+  - Managed by SQLite DB
+  - Queue images for prefetching
+  - Preload prefetched image
+  - Manual pruning to control cache size
+
+::: {.notes}
+
+[pause 1.0s]
+
+Glance has a local image cache that stores copies of image files. The Glance image cache enables
+multiple API servers to serve the same image file, thus improving performance, consistency, and
+scalability.
+
+[pause 0.5s]
+
+The glance-cache.conf file defines properties for image caching, including enabling it. Glance
+stores image files in a local filesystem that is managed by a sqlite database. Images are queued
+for prefetching or preloading. Images are also pruned to control the cache size.
+
+
+:::
+
+
+## Optional Image Cache (2)
+
+- Transparent to end-user
+- When enabled, images are automatically cached
+- Cache location defined in glance-api.conf
+  - [DEFAULT]
+  - Image_cache_dir = /opt/stack/data/glance/cache/
+- Several utilities available to manage cache
+
+::: {.notes}
+
+[pause 0.5s]
+
+This process is transparent to the end user. When Glance image cache is enabled, images are
+automatically cached. The default is for the image to be cached after first use. The cache
+location is defined in glance-api.conf as shown here. This file needs to be updated to support
+image caching.
+
+[pause 0.5s]
+
+Several utilities provided to help manage cache. The glance-cache-pruner utility helps control
+the size of the image cache. Glance-cache-cleaner removes stalled or invalid images.
+Glance-cache-manage lists or deletes the images in the cache. It can also be used to preload or
+prefetch images in the cache. For example, many customers preload their golden or master images.
+
+[pause 0.5s]
+
+For more information, see the documentation on cache found on the OpenStack documentation
+website.
+
+:::
+
+
+# Summary
+
+::: {.notes}
+
+[pause 1.0s]
+
+We are now at the end of our module on Glance, OpenStack's image service.
+
+:::
+
+
+## Summary - Learning Objectives
+
+You should now be able to:
+
+- Explain what an image is
+- import images to Glance
+- List as many backends for the image repo
+- Understand pros & cons of custom images
+- Explain the purpose of image metadata
+
+::: {.notes}
+
+[pause 1.0s]
+
+At this point, you should be able to explain what an image is, import images to Glance, list as
+many backends as you can for the image repository, understand the pros and cons of building a
+custom image, and explain the purpose of image metadata.
+
+[pause 0.5s]
+
+As you work through this next lab, you are encouraged to go back to these presentations and
+review the material as needed.
+
+:::
+
+
+# Lab Exercise: Glance Image Service
+
+
+<!-- ![Slide 158 diagram](images/slide_158_image_01.png){width="80%"} -->
+
+::: {.notes}
+
+[pause 1.0s]
+
+You are now ready to begin Lab 3: Image service using Glance. Work through the lab by carefully
+following each step. You are encouraged to look back to the presentations in this module and
+earlier modules to refresh your memory and reinforce the concepts. Good luck with Lab 3.
+
+:::

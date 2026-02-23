@@ -1,0 +1,1037 @@
+---
+title: "Module 8: Telemetry"
+subtitle: "OS220: OpenStack Ceilometer, Aodh, and Gnocchi"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "OS220 - OpenStack Administration"
+    width: 1280
+    height: 720
+    margin: 0.1
+    transition: slide
+    background-transition: fade
+  pptx:
+    reference-doc: ./template.pptx
+    highlight-style: tango
+    slide-level: 2
+footer: © Mirantis Training - OS220 - OpenStack Administration"
+
+---
+
+# Openstack Ceilometer / Aodh / Gnocchi {.center}
+
+# (Telemetry Services) {.center}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 483 diagram](images/slide_483_image_01.png){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 483 diagram](images/slide_483_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+OpenStack Telemetry consists of multiple services: Ceilometer, Aodh, CloudKitty, Panko, and Monasca.
+In this lesson, you will learn about the Ceilometer and Aodh services, working with Gnocchi as a time-series database.
+After a general overview, this lesson will focus on two primary use cases:
+Autoscaling of cloud resources, using Heat and Telemetry services (that is Heat, Ceilometer, and Aodh); and
+Adding LBaaS (or Octavia) to the autoscaling discussion to illustrate the implementation of a typical cloud application.
+:::
+
+---
+
+At the end of this presentation, you should be able to:
+Discuss the role of each component
+Ceilometer Aodh Gnocchi
+Describe how to implement autoscaling
+Optionally, how to add LBaaS to autoscaling of your app
+
+Objectives
+
+484
+
+![Slide 484 diagram](images/slide_484_image_01.png){width="80%"}
+
+::: {.notes}
+At the end of this presentation, you should be able to discuss the roles of Ceilometer, Aodh, and Gnocchi and describe how to implement autoscaling and optionally, how to add LBaaS to autoscaling of your app.
+:::
+
+---
+
+# Example Cloud Application {.center}
+
+# Web Servers With Load Balancing {.center}
+
+::: {.notes}
+In this next section, we’ll look at an example of a cloud application that includes web servers with load balancing.
+:::
+
+---
+
+Example “composite cloud application”
+
+![Slide 486 diagram](images/slide_486_image_01.jpg){width="80%"}
+
+::: {.notes}
+Let's start by stepping through the resources needed for the Composite Cloud App. First, you need a set of web servers.
+:::
+
+---
+
+# Example “Composite Cloud Application” {.center}
+
+![Slide 487 diagram](images/slide_487_image_01.jpg){width="80%"}
+
+::: {.notes}
+Next, you need a set of app servers to run your application.
+:::
+
+---
+
+# Example “Composite Cloud Application” {.center}
+
+![Slide 488 diagram](images/slide_488_image_01.jpg){width="80%"}
+
+::: {.notes}
+Then, you need a set of database servers.
+:::
+
+---
+
+# Example “Composite Cloud Application” {.center}
+
+![Slide 489 diagram](images/slide_489_image_01.jpg){width="80%"}
+
+::: {.notes}
+You might need other servers to perform various tasks and workloads.
+:::
+
+---
+
+# Example “Composite Cloud Application” {.center}
+
+![Slide 490 diagram](images/slide_490_image_01.jpg){width="80%"}
+
+::: {.notes}
+You need a load balancer to front-end your Web servers.
+The load balancer automatically creates a virtual IP (VIP) to use for connections.
+:::
+
+---
+
+# Example “Composite Cloud Application” {.center}
+
+![Slide 491 diagram](images/slide_491_image_01.jpg){width="80%"}
+
+::: {.notes}
+Since the load balancer is the front-end for the Web servers, using port 80 (HTTP) by default, you need a security group rule to open port 80.
+:::
+
+---
+
+# Example “Composite Cloud Application” {.center}
+
+![Slide 492 diagram](images/slide_492_image_01.jpg){width="80%"}
+
+::: {.notes}
+More than likely, you will need to SSH to your app servers. That means you need a security group rule to open port 22.
+:::
+
+---
+
+# Example “Composite Cloud Application” {.center}
+
+![Slide 493 diagram](images/slide_493_image_01.jpg){width="80%"}
+
+::: {.notes}
+Lastly, to access the load balancer and app servers, you need to allocate and associate a floating IP (FIP) with the VIP and each app server.
+:::
+
+---
+
+OpenStack components
+Nova: manages instance creation Glance: provides images for instances Neutron provides
+Networking (IPAM, routing, NAT, etc) Firewall rules through security group rules
+Port 22 for SSH Port 80 for HTTP
+Virtual IP for LB Floating IPs
+Octavia: LBaaS
+Keystone: authentication, authorization, and RBAC policies
+Plus
+Heat to orchestrate creation of the app
+Ceilometer/Aodh to provide autoscaling of, for example, web servers
+The app code might also be deployed through containers - involving more components!
+
+Example “composite cloud application”
+
+494
+
+![Slide 494 diagram](images/slide_494_image_01.png){width="80%"}
+
+::: {.notes}
+So why use OpenStack? This example provides a good illustration. OpenStack allows you to automate the deployment of different applications with load balancing and autoscaling.
+- Here you can see how the various components of OpenStack work together to make a cohesive whole.
+- The components include Nova for managing instance creation and Glance for providing images for those instances.
+- Neutron provides networking (including PAM, routing, NAT, etc.), firewall rules through security group rules using port 22 for SSH and port 80 for HTTP, a virtual IP for the load balancer, and floating IPs.
+- Octavia is focused on Load Balancing as a Service, and Keystone provides authentication, authorization, and RBAC policies.
+- Additionally, OpenStack includes Heat, which is used to orchestrate creation of the app, and Ceilometer/Aodh for autoscaling, for example web servers.
+- Your application code might also be deployed through containers, thus involving additional components.
+- Your application developers can focus on their code.
+- When the code is ready, they can deploy it on the App Servers.
+- The code might be installed when the servers are deployed, or it could be baked into the image used for the servers.
+- The code could be made up of various microservices and deployed through containers, or it could be deployed as part of your CI/CD process, using any of the available CI/CD tools.
+- As you deploy the infrastructure, you might use different sizes for each type of server.
+- For example, the database servers most likely require more storage than the web servers.
+- You might want to use different operating systems for each type of server, such as Red Hat, CentOS, and so on.
+- There might be different software on or different firewall rules for each type of server.
+- There are a number of different system configuration needs you might have.
+Using the Heat component to orchestrate or automate the app and the entire infrastructure is not required, but this is definitely desired. This might seem simple in this discussion, but it can get complex to implement. By automating with Heat, you can reduce that complexity.
+Additionally, suppose you need to test a new version of your app and it requires a DB upgrade. You simply need to edit your Heat template and modify it to download your app code and the DB code. No need to re-build another image.
+:::
+
+---
+
+Heat template resources:
+App Servers (medium VMs) Firewall rule for SSH (port 22) Floating IP for each
+Install & configure app software DB Servers (large VMs)
+Install & configure DB software Web servers (small VMs)
+Install & configure web server (Apache, NGINX, etc)
+Other Servers (VMs) Load balancer
+VIP
+Firewall rule for HTTP (port 80) LB_pool
+Web Server(s) (small VMs) Auto-scaling
+What? Web Servers
+How many to add/remove? When? Ie;
+CPU > 85% then scale up CPU < 5% then scale down
+
+Heat: deploy “composite cloud application”
+
+495
+
+![Slide 495 diagram](images/slide_495_image_01.png){width="80%"}
+
+::: {.notes}
+Here you can see an overview of what a Heat template would look like when used to deploy the "cloud app."
+Your code runs on the App Servers and might be installed when the servers are deployed, baked into the image used for the servers, made up of various microservices and deployed through containers, or deployed as part of your CI/CD process.
+Included in the Heat template resources are the App Servers, which are medium VMs. They have a firewall rule for SSH on port 22 and a floating IP for each server. The Heat template can help install and configure the app software.
+The Heat template resources also include installation and configuration information for the DB Servers, which are large VMs, as well as web servers, which are small VMs. Web servers typically include Apache, NGINX, or other web delivery application.
+Heat templates can be used to install and configure other Servers or VMs.
+The Heat template can include information about the load balancer such as its VIP and firewall rule for HTTP on port 80. The template might also have information about the LB_pool, including web servers, which are small VMs.
+   
+Auto-scaling is part of the Heat template. You might find information that addresses such questions as what web servers are being used, how many need to be added or removed, and when to scale. For example, you might want to scale up when CPU usage is greater than 85% and scale down when it drops below 5%.
+:::
+
+---
+
+# Openstack Telemetry Services {.center}
+
+CEILOMETER, AODH, AND GNOCCHI
+
+::: {.notes}
+This next section will cover OpenStack Telemetry services using Ceilometer, Aodh, and Gnocchi. Telemetry includes metrics, alarms, and events.
+Additional information about the architecture of Ceilometer can be found on the OpenStack documentation website.
+https://docs.openstack.org/ceilometer/ussuri/contributor/architecture.html
+:::
+
+---
+
+Telemetry services architecture
+
+![Slide 497 diagram](images/slide_497_image_01.jpg){width="80%"}
+
+::: {.notes}
+This diagram shows the overall architecture of the Telemetry components - Ceilometer, Gnocchi, and Aodh. Let’s go through the diagram step by step.
+Ceilometer includes a polling agent that collects usage data about the system that can be used by billing systems or interpreted by analytic tooling. Ceilometer polls for data from other OpenStack components, such as Nova, Glance, and Neutron.
+The Ceilometer notification agent receives data from the message bus via the open-source message-broker RabbitMQ.
+Ceilometer then uses one or more pipelines to publish or store the data or metrics in Gnocchi. Gnocchi is an open-source, multi-tenant, time-series, metrics, and resources database.
+Aodh evaluates the data or metrics and compares it with alarms or thresholds.
+If the value specified in the alarm is exceeded, an event is generated by Aodh.
+In our "cloud app" example, the event drives Heat to provide autoscaling.
+:::
+
+---
+
+Ceilometer: collects usage data about the system that can be used by billing systems or interpreted by analytic tooling
+Data sources:
+Polling: retrieves data from the infrastructure, such as, a hypervisor Notifications: consumes messages from the message queue system (RabbitMQ)
+Gnocchi: an open-source, multi-tenant, time-series, metrics, and resources database
+Aodh: generates events (alerts) based on data thresholds
+
+Telemetry components
+
+498
+
+::: {.notes}
+To recap what we saw in the diagram, There are three components to telemetry in OpenStack - Ceilometer, Gnocchi, and Aodh.
+- Outside of Kubernetes, a ceilometer is a device that captures data about clouds in the atmosphere, and that’s comparable to what OpenStack’s Ceilometer does.
+- Ceilometer collects usage data about the system that can be used by billing systems or interpreted by analytic tooling.
+- It collects many metrics and measurements about the core OpenStack components, such as how much RAM has been consumed per VM.
+- There are two data sources - polling and notifications.
+- Polling is used to retrieve data from the infrastructure, such as a hypervisor.
+- Notifications consume messages from RabbitMQ, the message queue system.
+Gnocchi is an open-source, multi-tenant, time-series, metrics, and resources database. It provides metrics data as a service and stores large amount of metrics, while being scalable, performant, and fault-tolerant. Note that while it started under the Ceilometer project, Gnocchi is not an official OpenStack component.
+Aodh, is an alarming service. The name Aodh is derived from the Celtic god of fire. Aodh is used to generate events or alerts based on data thresholds. You can define thresholds that trigger these alarms. The supported thresholds are: 
+Gnocchi_resources_threshold, 
+Gnocchi_aggregation_by_metrics_threshold, and 
+Gnocchi_aggregation_by_resources_threshold.
+:::
+
+---
+
+Polling agents: retrieves data from the infrastructure, such as, a hypervisor
+Compute agent: responsible for collecting instances usage data from compute nodes
+Central agent: responsible for collecting additional information for networking, block storage, object storage IPMI agent: responsible for collecting IPMI sensor data
+Notification agent: consumes messages from the message queue system (RabbitMQ)
+Compute service (Nova) Image service (Glance) Network service (Neutron) And so on
+
+Ceilometer agents
+
+499
+
+::: {.notes}
+There are two main types of agents in Ceilometer - polling agents and notification agents.
+Polling agents retrieve data from the infrastructure. There are three polling agents - the compute agent, the central agent, and the IPMI agent.
+The compute agent is responsible for collecting instance usage data from the compute nodes. The compute agent, ceilometer-agent-compute, runs on each compute node
+The central agent is responsible for collecting additional information for networking, block storage, and object storage. The central agent, ceilometer-agent-central, runs on the controller nodes.
+The IPMI agent is responsible for collecting IPMI sensor data.
+The notification agent consumes messages from RabbitMQ, the message queue system, and it communicates with the compute service Nova, the image service Glance, the network service Neutron, and other services. The notification agent ceilometer-agent-notification runs on the controller node.
+:::
+
+---
+
+Ceilometer collects many metrics, however, not all might be relevant to you Update the configuration files to include select meters to generate or process
+polling.yaml pipeline.yaml
+By default, the defined metrics are collected every 10 minutes; you might need to change
+polling.yaml
+Define metric and and its polling interval For example:
+Suppose you have an event testing CPU utilization every minute If the collection interval is 10 minutes, the event will test old data
+
+Data polling
+
+500
+
+::: {.notes}
+Ceilometer collects many metrics, however they might not all be relevant to your situation. To select specific meters to generate or process, you will need to update the polling.yaml and pipeline.yaml configuration files.
+By default, the defined metrics are collected every 10 minutes. You might also want to define the metric and its polling interval in the polling.yaml. As an example, suppose you have an event testing CPU utilization every minute. If the collection interval is 10 minutes, the event will test old data.
+Refer to OpenStack documentation on telemetry best practices for more details.
+   https://docs.openstack.org/ceilometer/latest/admin/telemetry-best-practices.html
+:::
+
+---
+
+Metrics database/backends
+Gnocchi
+Monasca
+Events database/backend
+ElasticSearch
+MongoDB
+MySQL
+PostgreSQL
+Alarms database/backends
+MySQL
+PostgreSQL
+
+Telemetry backends
+
+501
+
+::: {.notes}
+Here is information about the telemetry backends.
+The metrics database/backends are Gnocchi and Monasca. The events database/backend include ElasticSearch, MongoDB, MySQL, and PostgreSQL. The alarms database/backends are MySQL and PostgreSQL.
+As a reminder, the compute agent ceilometer-agent-compute runs on each compute node, the central agent ceilometer-agent-central runs on the controller node, and the notification agent ceilometer-agent-notification runs on the controller node.
+:::
+
+---
+
+memory, memory.usage, memory.resident
+cpu
+vcpus
+disk.device.read.requests, disk.device.write.requests, disk.device.read.bytes, disk.device.write.bytes
+network.incoming.bytes, network.outgoing.bytes, network.incoming.packets, network.outgoing.packets
+network.incoming.packets.drop, network.outgoing.packets.drop, network.incoming.packets.error, network.outgoing.packets.error identity.authenticate.success, identity.authenticate.pending, identity.authenticate.failure port.receive.packets, port.transmit.packets, port.receive.bytes, port.transmit.bytes volume.size, snapshot.size
+And more!
+
+Instance usage data (metrics)
+
+502
+
+::: {.notes}
+Here is a list of the various instance usage data that can be gathered for your metrics. 
+You can collect information about memory, including memory.usage and memory.resident. You can also gather data on cpu and vcpus as well as disk.device.read.requests, disk.device.write.requests, disk.device.read.bytes, and disk.device.write.bytes.
+There are several network related metrics available. You can get data on incoming and outgoing bytes and packets including dropped packets and packets with errors.
+You can gather metrics on identity authentication success, pending and failure. You can also get data on port.receive.packets, port.transmit.packets, port.receive.bytes, and port.transmit.bytes
+Volume.size and snapshot.size data can be gathered and more. For more details and a complete list of measurements, see the OpenStack documentation on telemetry measurements.
+https://docs.openstack.org/ceilometer/latest/admin/telemetry-measurements.html
+:::
+
+---
+
+- name: 'vcpus'
+
+event_type: *instance_events type: 'gauge'
+unit: 'vcpu'
+volume: $.payload.vcpus user_id: $.payload.user_id project_id: $.payload.tenant_id
+resource_id: $.payload.instance_id user_metadata: $.payload.metadata metadata:
+<<: *instance_meta
+
+- name: 'compute.instance.booting.time'
+
+event_type: 'compute.instance.create.end' type: 'gauge'
+unit: 'sec' volume:
+fields:  [$.payload.created_at, $.payload.launched_at] plugin: 'timedelta'
+project_id: $.payload.tenant_id resource_id: $.payload.instance_id user_metadata: $.payload.metadata metadata:
+<<: *instance_meta
+
+Ceilometer collects metrics based on:
+ceilometer/data/meters.d/meters.yaml For example:
+
+Defining metrics
+
+503
+
+::: {.notes}
+Ceilometer collects metrics based on the configuration specified in ceilometer/data/meters.d/meters.yaml. An example of the meters.yaml file is shown here.
+Be very careful when modifying this file. Unless you intend to, do not remove any existing meter definitions from meters.yaml. Also be aware that in some cases the collected meters will be different than what is referenced in the documentation.
+For more information about telemetry data collection and defining metrics, refer to the OpenStack documentation.
+    https://docs.openstack.org/ceilometer/ussuri/admin/telemetry-data-collection.html
+:::
+
+---
+
+Display metrics being collected for instance
+ID: 59d127ba-35e2-4932-88b9-7683076de622)
+
+Instance data example (1)
+
+504
+
+::: {.notes}
+Here we see an example of the metrics collected for an instance with the instance ID highlighted in yellow. To obtain these metrics, use the CLI command openstack metric resource show <instance ID>.
+Similarly, you can issue an openstack metric list | grep <instance ID> command to see the metrics collected for the instance.
+:::
+
+---
+
+Instance data example (2)
+
+505
+
+::: {.notes}
+Here we see the memory.usage metric collected for the same instance as the previous example. To display this information, use the command openstack metric measures show memory.usage -r <instance ID>.
+Notice the granularity. The collection or polling interval is every 60 seconds. The memory.usage data is stored in terms of MB.
+:::
+
+---
+
+# Autoscaling Cloud Applications {.center}
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+506
+
+# Heat / Ceilometer / Gnocchi / Aodh {.center}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 506 diagram](images/slide_506_image_01.jpg){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 506 diagram](images/slide_506_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+This next lesson introduces the topic of autoscaling cloud applications with:
+Heat templates to orchestrate the deployment the cloud applications, including Heat resources that define the metrics to collect and the alarms to trigger actions;
+Ceilometer to collect the metrics (data) to support autoscaling of Heat applications;
+Gnocchi for the time series database; and
+Aodh to provide the alarming service to drive the autoscaling actions.
+:::
+
+---
+
+Telemetry service driving heat (for autoscaling)
+
+![Slide 507 diagram](images/slide_507_image_01.png){width="80%"}
+
+::: {.notes}
+- This diagram shows the OpenStack Telemetry service driving Heat for autoscaling.
+- Using the integration with OpenStack Telemetry services, Heat can dynamically adjust resource usage based on demands.
+- This is known as autoscaling.
+- A scaling group and scaling policy are defined.
+- The scaling policy is capable of being triggered through an event or alert from Aodh.
+- Autoscaling allows Heat to provision additional resources to meet demand and remove them later when the resources are no longer required.
+:::
+
+---
+
+Heat integrates with Ceilometer/Gnocchi/Aodh to provide autoscaling (up and down) of virtual machine instances for cloud composite applications (stacks)
+Defined with Heat template, using the following resources:
+OS::Heat::AutoScalingGroup - defines what to scale Includes OS::Nova::Server
+OS::Heat::ScalingPolicy - defines how many to scale OS::Aodh::Gnocchi….Alarm - defines alarms for when to scale Possibly others for load balancing
+Manual scaling (up or down) supported through REST API calls
+Uses web hook (URL) in outputs of Heat stack
+
+Autoscaling: orchestration + telemetry services
+
+508
+
+::: {.notes}
+Heat integrates with Ceilometer/Gnocchi/ and Aodh to provide up and down autoscaling of virtual machine instances for cloud composite applications or stacks. Here you can see the minimum Heat template resources that are required to implement auto-scaling.
+Defined with a Heat template, Heat uses the following resources:
+OS::Heat::AutoScalingGroup defines what to scale. This includes OS::Nova::Server. The resource is typically a VM instance.
+OS::Heat::ScalingPolicy defines how many resources, that is VM instances, to scale up or down.
+OS::Aodh::Gnocchi….Alarm defines when to generate an alarm. The alarm then drives the scaling process. Note that there are several types of Gnocchi alarms, including the OS::Aodh::GnocchiAggregationByMetricsAlarm, the OS::Aodh::GnocchiAggregationByResourcesAlarm, and the OS::Aodh::GnocchiResourcesAlarm.
+There might be other resources, such as a load balancer, included as part of the overall Heat template.
+You can also manually scale the cloud application through REST API calls. There should be two webhooks, in the form of URLs, defined as outputs in your Heat template. One webhook is used to scale up and the other to scale down.
+:::
+
+---
+
+Autoscaling overview - start
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+509
+
+![Slide 509 diagram](images/slide_509_image_01.jpg){width="60%"}
+![Slide 509 diagram](images/slide_509_image_02.jpg){width="60%"}
+![Slide 509 diagram](images/slide_509_image_03.png){width="60%"}
+
+::: {.notes}
+This diagram shows the relationship of the Heat resources for autoscaling of a virtual machine instance:
+The OS::Heat:AutoScalingGroup defines the resource to auto-scale. In this case, the OS::Nova::Server resource. These resources might be defined in a nested Heat template. The OS::Heat::ScalingPolicy defines the up and down scaling and how many resources to add or delete. The OS::Aodh::Gnocchi … Alarm defines the conditions or events when autoscaling should be triggered.
+Auto-scaling requires at least one AutoScalingGroup resource, one or more ScalingPolicy resources to scale up or down, and one or more Aodh Alarm resources. In this case, the AutoScalingGroup defines a desired capacity of 3 VMs. The application starts with 3 VMs.
+See the OpenStack documentation on telemetry measurements for more information on the metrics collected.
+  https://docs.openstack.org/ceilometer/latest/admin/telemetry-measurements.html
+:::
+
+---
+
+Autoscaling overview - scale up
+
+![Slide 510 diagram](images/slide_510_image_01.jpg){width="80%"}
+
+::: {.notes}
+Suppose an alarm is generated related to a cpu high condition. A fourth VM is deployed and added to the AutoScalingGroup.
+:::
+
+---
+
+Autoscaling overview - scale down
+
+![Slide 511 diagram](images/slide_511_image_01.jpg){width="80%"}
+
+::: {.notes}
+Next, suppose another alarm is generated for a cpu low condition. 1 of the VMs is destroyed.
+It might not be the same VM that was added when the scale up was executed.
+:::
+
+---
+
+Heat autoscalinggroup
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+512
+
+![Slide 512 diagram](images/slide_512_image_01.jpg){width="60%"}
+![Slide 512 diagram](images/slide_512_image_02.jpg){width="60%"}
+![Slide 512 diagram](images/slide_512_image_03.png){width="60%"}
+
+::: {.notes}
+Pay close attention to the colors over the next several slides. They are included to help you bridge the relationship between resources over multiple slides. The information here should clarify what resource is auto-scaled.
+The AutoScalingGroup is a Heat resource that defines a minimum, maximum, and initial desired number of virtual machine instances for the composite application represented by the Heat template.
+In this case, the resource type is a Nova server, or a virtual machine instance. The OS::Nova::Server resource is defined within the AutoScalingGroup resource.
+- min_size, desired_capacity, and max_size are shown at the bottom in black.
+- min_size is a setting that specifies the the minimum number of instances that can be provisioned.
+- Additionally, scale down events will stop at the value of the min_size parameter and reduce no further.
+- desired_capacity defines the desired number of instances for the application.
+- This matches the number of servers provisioned when the application is deployed.
+max_size defines the maximum number of instances that can be provisioned. Auto-scaling cannot exceed this limit.
+Note that when coded as shown on the slide, the AutoScalingGroup can only scale 1 resource. In this case, that is a VM instance. To scale multiple resources, such as an instance and a LB pool member, you must define the resources in a separate template and nest it within the AutoScalingGroup.
+:::
+
+---
+
+Heat scalingpolicy: scale up and down
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+513
+
+![Slide 513 diagram](images/slide_513_image_01.jpg){width="60%"}
+![Slide 513 diagram](images/slide_513_image_02.jpg){width="60%"}
+![Slide 513 diagram](images/slide_513_image_03.png){width="60%"}
+
+::: {.notes}
+The ScalingPolicy is a Heat resource used to manage the scaling, up and down, of an AutoScalingGroup resource.
+The ScalingPolicy resource defines the scaling to perform  for the referenced resource, that is whether to adjust up or down and how many to adjust. In this case, we are scaling the asg AutoScalingGroup resource from the previous slide.
+adjustment_type defines when the autoscaling occurs. The allowed values for the type of adjustment are change_in_capacity, exact_capacity, and percent_change_in_capacity. A string value that is either absolute or a percentage is required, and it can be updated without replacement.
+cooldown defines a period between auto-scaling calls where no further auto-scaling can take place. The cooldown period is in seconds and a number value is expected. This value can be updated without replacement.
+Each OS::Heat::ScalingPolicy resource sets a signal_url attribute with the webhook to use for scaling. The signal_url is defined in the Aodh Alarm resource. The next two slides have examples of the Aodh alarm usage.
+:::
+
+---
+
+Aodh alarm: scale up
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 514 diagram](images/slide_514_image_01.jpg){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 514 diagram](images/slide_514_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+Here we see an example of an Aodh alarm being used to scale up. The OS::Aodh::GnocchiAggregationByResourcesAlarm is a metric service or Gnocchi resource that defines what is being monitored. For example, you might monitor the metering metric cpu_util or a condition such as cpu_utilization being greater than 80%.
+In this example, an alarm is triggered when the threshold of 80% for 5 minutes on the mean CPU is exceeded. The action taken is determined by the alarm_actions property. In this example, the webhook from the signal_url attribute of the ServerScaleUpPolicy can be invoked to scale up.
+:::
+
+---
+
+Aodh alarm: scale down
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+515
+
+![Slide 515 diagram](images/slide_515_image_01.jpg){width="60%"}
+![Slide 515 diagram](images/slide_515_image_02.jpg){width="60%"}
+![Slide 515 diagram](images/slide_515_image_03.png){width="60%"}
+
+::: {.notes}
+Here is a similar example, but this time we are scaling down. We are still monitoring the metering metric cpu_util, but this time we are looking for the condition of mean cpu_util < 5%.
+In this example, an alarm is triggered when we are below the threshold of 5% for 5 minutes on the mean CPU. The action taken is determined by the alarm_actions property. In this case, the webhook from the signal_url attribute of the ServerScaleDownPolicy would be invoked to scale down.
+:::
+
+---
+
+Heat template outputs (reference)
+
+![Slide 516 diagram](images/slide_516_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here we see example outputs to store the list of VM instances, names, and IP addresses in the stack output.
+:::
+
+---
+
+Heat template outputs (reference)
+
+![Slide 517 diagram](images/slide_517_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here you see example outputs for the autoscaling Heat template needed to create the webhooks used for scaling up and scaling down.
+To scale the Heat stack manually, simply create a REST API POST request using the scale_up_url or scale_down_url webhook (URL) stored in the stack outputs.
+:::
+
+---
+
+Manually autoscaling (reference)
+
+![Slide 518 diagram](images/slide_518_image_01.jpg){width="80%"}
+
+::: {.notes}
+To manually scale a Heat stack, you must use the REST API to POST to a Web hook, for example scale_up_url or scale_down_url outputs.
+The request is routed to the heat-api process, defined by the heat-api endpoint in the service catalog.
+In the case of a scale-up request, the REST API equivalent of an openstack server create request is issued to create another virtual machine instance.
+Note: The signal_url must be enclosed within double quotes.
+An example of a manual scale-up REST API request is on the next slide.
+:::
+
+---
+
+HTTP POST to heat-api endpoint ...
+<host_ip>/heat-api/v1/c26147194d1243c5870f13b3a382002e/
+… to scale up ...
+resources/ServerScaleUpPolicy
+… the LB-ASG stack
+stacks/LB-ASG/7b7b6885-388e-4949-afd5-707f555f9fdb/
+
+Manual scale up example
+
+519
+
+![Slide 519 diagram](images/slide_519_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here we see an example of manually scaling up using the scale_up_url from the stack output of the LB-ASG stack.
+There are a few things to note about this process:
+The user issuing the POST must have the heat_stack_owner role assigned to them.
+Also, the request MUST be encapsulated within double quotes.
+Finally, if you receive the User is not authorized to perform action message, check your heat.conf file and remove the [ec2authtoken] stanza and properties. Also check the quotation marks – if you paste the URL, you might have issues with the pasted character string. It is best to retype them.
+:::
+
+---
+
+# Autoscaling With Lbaas {.center}
+
+HEAT / CEILOMETER / GNOCCHI / AODH / OCTAVIA
+
+::: {.notes}
+In this section, we’ll look at autoscaling with LBaaS using Heat, Ceilometer, Gnocchi, Aodh, and Octavia.
+:::
+
+---
+
+Autoscaling + LBAAS
+
+![Slide 521 diagram](images/slide_521_image_01.jpg){width="80%"}
+
+::: {.notes}
+Up to this point, the discussion has been focused on autoscaling for the OS::Nova::Server resource.
+This diagram expands beyond the simple autoscaling of a set of VMs. It illustrates a common deployment for an HTTP server application, assuming the autoscaling of the VMs, including a load balancer to front-end the HTTP server.
+The HTTP server application includes a load balancer defined for port 80.
+When a new VM instance is added in order to scale up, it is added to the load balancer group or pool due to the PoolMember resource also being defined as part of the autoscaling group resource found  in OS::Heat::AutoScalingGroup.
+Typically, you also have a floating IP address associated with the load balancer. Users connect to the HTTP servers using the floating IP address. The load balancer spreads the HTTP traffic across the HTTP servers in the group.
+For this example, there are 12 Heat template resources defined. While that might seem daunting, you can find examples on github that can be used to create the Heat template.
+:::
+
+---
+
+UI: Stack topology
+
+![Slide 522 diagram](images/slide_522_image_01.jpg){width="80%"}
+
+::: {.notes}
+This diagram shows the Heat stack topology for the load balanced / autoscaled stack discussed using the reference information in the next section. Compare the stack topology with the Heat template.
+The nested template, lb_server.yaml, defines the resources for the AutoScalingGroup. Those resources are not shown in the stack topology.
+To view the autoscaled resources, you must drill-down on the AutoScalingGroup. At that point, you see the VM instances.
+:::
+
+---
+
+UI: Stack events
+
+![Slide 523 diagram](images/slide_523_image_01.png){width="80%"}
+
+::: {.notes}
+This chart shows an example of the UI where several events have been generated based on the OS::Aodh::GnocchiAggregationByResourcesAlarm resources, cpu_alarm_high and cpu_alarm_low.
+The stack started with 3 instances. Then:
+A cpu_alarm_low event scaled the stack down by an instance. This leaves 2 instances running.
+Another cpu_alarm_low event scaled the stack down by another instance, leaving a single instance running. Due to the min_size property value of 1 on the AutoScalingGroup, no more instances can be removed. Any further cpu_alarm_low events are ignored until there are at least 2 instances.
+A cpu_alarm_high event scaled the stack up by an instance. This leaves 2 instances running.
+Another cpu_alarm_high event scaled the stack up by another instance, leaving 3 instances running.
+Another cpu_alarm_high event scaled the stack up by another instance, leaving 4 instances running.
+:::
+
+---
+
++	+	+	+	+
+The cpu_alarm_low has triggered an event to scale down The alarm state can be:
+ok: The rule governing the alarm has been evaluated as False
+alarm: The rule governing the alarm have been evaluated as True
+insufficient data: There are not enough datapoints available in the evaluation periods to meaningfully determine the alarm state
+
+The Heat template defined two alarms: cpu_alarm_high and cpu_alarm_low Display the alarms
+openstack alarm list
+
++	+	+	+	+
+| alarm_id	| type	| name
+
++	+	+	+
+
+| state |
++
+
+| 5c5dc8b1-9ae8-... | gnocchi_aggregation_by_resources_threshold | SCALE-cpu_alarm_high-rof6gbliwnlv | ok	|
+
+cpu_alarm_low
+
+| 9b701b71-dfe9-... | gnocchi_aggregation_by_resources_threshold | SCALE-	-2prznwlkreej |
+
+alarm
+
+|
+
+Display alarms
+
+524
+
+
+::: {.notes}
+This slide introduces alarms. Alarms are an Aodh function. The name is derived from the alarm resource label in the Heat template. Notice that the stack name included in the alarm name is SCALE.
+To display the alarms, use the openstack alarm list command.
+In this example, the cpu_alarm_low alarm has triggered an event that drove the autoscaling to scale down based on the ServerScaleDownPolicy scaling policy resource in the Heat template.
+The alarm state can be:
+ok, which means the rule governing the alarm has been evaluated as False;
+alarm, which means the rule governing the alarm has been evaluated as True; or
+insufficient data, which means there are not enough datapoints available in the evaluation periods to meaningfully determine the alarm state
+:::
+
+---
+
+|  SCALE-cpu_alarm_low-2prznwlkreej
+
+The cpu_alarm_low alarm has triggered an event Display the alarm details
+
+alarm show
+
+openstack	9b701b71-dfe9-49f3-ab76-734c068c4db5
+
++	+
+| Field	| Value
+
+| mean
+
+| aggregation_method
+| alarm_actions
+
+| ['trust+http://172.31.4.43/heat-api/v1/
+
+5a4512c51df34082b067adcb94374a3f/
+
+stacks/SCALE/ffd0e8c1-140d-4332-b89a-77ad81d0da9c/
+
+resources/ServerScaleDownPolicy/signal']
+
+| alarm_id
+
+| 9b701b71-dfe9-49f3-ab76-734c068c4db5
+
+| comparison_operator
+
+| lt
+
+|
+
+scale down if the mean CPU < 5% for 5	minutes
+
+| True
+| 5
+| 60
+| cpu
+
+| instance
+| low
+
+|
+
+| description
+| enabled
+| evaluation_periods
+| granularity
+| metric
+| name
+| resource_type
+| severity
+| state
+| state_reason
+
+alarm
+
+|
+
+Transition to alarm due to 5 samples outside threshold,
+
+most recent: 28758729050.166668
+
+| state_timestamp
+| threshold
+
+| 2020-11-18T16:46:11.980393
+| 180000000000.0
+
+Display alarm details
+
+525
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 525 diagram](images/slide_525_image_01.png){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 525 diagram](images/slide_525_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+This slide shows alarm details for the cpu_alarm_low alarm. To display alarm details, use the command openstack alarm show <alarm id>.
+When triggered, the alarm drives the alarm_actions. In this case, to drive the scale down policy.
+- Take a look at the details for alarm_actions highlighted in yellow.
+- There is the Heat API endpoint which is a URL, the project is the long number starting with 5a4512…, the stack name which is SCALE, the stack id which is the ID number following the word SCALE, and the resources which indicate that the ServerScaleDownPolicy Heat resource will be used.
+- The alarm_actions data is stored in the stack output: scale_dn_url
+:::
+
+---
+
+Display alarm history
+
+526
+
+::: {.notes}
+Here you can see the alarm history for the cpu_alarm_low alarm. The current state is alarm, as shown in red.
+You can see in yellow that there was insufficient data regarding the initial state. Initially, all alarm states will be insufficient data. This state will remain until the data can be collected and evaluated.
+:::
+
+---
+
+# Autoscaling + Lbaas Heat Template {.center}
+
+# Reference Material {.center}
+
+::: {.notes}
+This next section will include reference material on Autoscaling and the LBaas Heat template.
+:::
+
+---
+
+OS::Heat::AutoScalingGroup
+OS::Nova::Server OS::Octavia::PoolMember
+OS::Heat::ScalingPolicy
+1 for scale-up
+1 for scale-down
+OS::Aodh::GnocchiAggregationByResourcesAlarm
+1 for scale-up
+1 for scale-down
+OS::Octavia::LoadBalancer OS::Octavia::Listener OS::Octavia::Pool OS::Octavia::HealthMonitor OS::Neutron::FloatingIP
+
+Autoscaling + LBAAS: heat template resources
+
+528
+
+::: {.notes}
+Here is a summary of the Heat template resources required for the previous slide.
+Note that as each VM instance is created or deleted, it must be added to the load balancer pool with the PoolMember resource.
+The following images in this section contain a working example, broken down by resource type. They are provided as reference material.
+:::
+
+---
+
+LBAAS Nested ASG resources (reference)
+
+![Slide 529 diagram](images/slide_529_image_01.jpg){width="80%"}
+
+::: {.notes}
+Heat templates can be nested, as shown in this lb_server.yaml template. In this case, nesting is required because lb_server defines multiple resources as members of the AutoScalingGroup.
+There are two ways to reference the nested template. The first way is by using the template file name as shown here. With this method, you cannot deploy the Heat stack from the Dashboard UI (Horizon). You can only use the CLI. The other way is via the template URL found at http://127.0.0.1:8091/lb_server.yaml. Using this method, you can deploy the Heat stack from the CLI as well as the Dashboard.
+The beginning number of resources or instances is determined by the desired_capacity property of the AutoScalingGroup. In this case, the desired_capacity is 3.
+The metadata property is used to set the metering.server_group with the ID of the Heat stack. It is required and referenced in the query property in the Aodh alarms.
+This information here is provided as reference only.
+:::
+
+---
+
+LBAAS Scaling policies (reference)
+
+![Slide 530 diagram](images/slide_530_image_01.jpg){width="80%"}
+
+::: {.notes}
+The ScalingPolicy resources define how many resources or instances to add or remove from the Heat stack when an alarm is exceeded.
+Example alarms are discussed in the next two images.
+This information here is provided as reference only.
+:::
+
+---
+
+LBAAS Scale up alarm (reference)
+
+![Slide 531 diagram](images/slide_531_image_01.jpg){width="80%"}
+
+::: {.notes}
+This alarm example will scale up based on the ServerScaleUpPolicy. This policy will add an instance when the mean aggregation of CPU across all instances for the stack is greater than 80% over the last minute.
+The signal_url is used to drive the heat engine for the scaling.
+This information here is provided as reference only.
+:::
+
+---
+
+LBAAS Scale down alarm (reference)
+
+![Slide 532 diagram](images/slide_532_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here you can see an example of using Octavia resources to implement a v2 load balancer. This is still part of the Heat template.
+The load balancer uses port 80 (HTTP). Requests are routed based on the ROUND_ROBIN balancing algorithm.
+This information here is provided as reference only.
+:::
+
+---
+
+LBAAS Resources (reference)
+
+![Slide 533 diagram](images/slide_533_image_01.jpg){width="80%"}
+
+---
+
+LBAAS Resources (reference)
+
+![Slide 534 diagram](images/slide_534_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here you can see an example of using Octavia resources to implement a v2 load balancer. This is still part of the Heat template.
+The load balancer uses port 80 (HTTP). Requests are routed based on the ROUND_ROBIN balancing algorithm.
+This information here is provided as reference only.
+:::
+
+---
+
+LB_SERVER Template (reference)
+
+![Slide 535 diagram](images/slide_535_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here you can see the resources from the lb_server.yaml template. They are nested in the AutoScalingGroup resource.
+As each instance is added or removed, it must also be added or removed from the load balancer pool.
+Since the AutoScalingGroup resource does not explicitly support multiple resources, you can nest this template to implicitly support multiple resources.
+This information here is provided as reference only.
+:::
+
+---
+
+SUMMARY
+
+::: {.notes}
+This marks the end of the LBaaS section of this course.
+:::
+
+---
+
+You should now be able to:
+Discuss the role of each component
+Ceilometer
+Aodh
+Gnocchi
+Describe how to implement autoscaling
+Optionally, how to add LBaaS to autoscaling of your app
+
+Summary
+
+537
+
+::: {.notes}
+At this point, you should be able to discuss the role of each component including Ceilometer, Aodh, and Gnocchi, and describe how to implement autoscaling. If you completed the optional material on LBaaS, you should know how to add LBaaS to autoscaling of your app.
+:::
+
+---
+
+EXERCISES
+
+538
+
+Work through the following lab in the exercise book:
+Lab: Deploy Heat template with autoscaling and load balancing
+
+![Slide 538 diagram](images/slide_538_image_01.png){width="80%"}
+
+::: {.notes}
+You are now ready to begin Lab 9: Deploy Heat Template with Autoscaling and Load Balancing. Work through the lab by carefully following each step. You are encouraged to look back to the presentations in this module and earlier modules to refresh your memory and reinforce the concepts. Good luck!
+:::

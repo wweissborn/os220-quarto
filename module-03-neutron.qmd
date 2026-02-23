@@ -1,0 +1,1934 @@
+---
+title: "Module 3: Neutron"
+subtitle: "OS220: OpenStack Networking Service"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "OS220 - OpenStack Administration"
+    width: 1280
+    height: 720
+    margin: 0.1
+    transition: slide
+    background-transition: fade
+  pptx:
+    reference-doc: ./template.pptx
+    highlight-style: tango
+    slide-level: 2
+footer: © Mirantis Training - OS220 - OpenStack Administration"
+
+---
+
+# Openstack Neutron {.center}
+
+# (Networking Service) {.center}
+
+159
+
+![Slide 159 diagram](images/slide_159_image_01.jpg){width="60%"}
+![Slide 159 diagram](images/slide_159_image_02.png){width="60%"}
+![Slide 159 diagram](images/slide_159_image_03.jpg){width="60%"}
+![Slide 159 diagram](images/slide_159_image_04.png){width="60%"}
+![Slide 159 diagram](images/slide_159_image_05.png){width="60%"}
+![Slide 159 diagram](images/slide_159_image_06.png){width="60%"}
+
+::: {.notes}
+This presentation provides an overview and details related to the Neutron networking service in OpenStack.
+Neutron is a core component of OpenStack that virtualizes network components, emulating the physical network. Networks can be created on request from the CLI, REST API, or Dashboard UI.
+Neutron provides support to build networks, subnetworks and routers plus advanced network topologies and policies for load balancing, firewalls,or VPN.
+Neutron provides the networking objects, including vendor support through the use of plugins, that the other OpenStack components use. There are many network vendors. That leads to many Neutron plugins that can be downloaded from the OpenStack Marketplace, git, or directly from the vendor.
+:::
+
+---
+
+At the end of this presentation, you should be able to:
+Explain Neutron architecture and plugin support
+Modular Layer (ML2) type and mechanism drivers Agents: IPAM, L3, DHCP
+Reference implementations
+Explain what network namespaces are and why they are important Explain what a floating IP is and how to use it
+Describe NAT and packet filtering, including how Neutron security groups apply Understand Open vSwitch (OVS) for virtual switch functions
+including traffic flow within OVS
+
+Objectives - neutron
+
+::: {.notes}
+At the end of this section, you should be able to explain Neutron architecture and plugin support, including the Modular Layer or ML2 type and mechanism drivers; agents such as IPAM, L3, and DHCP; and reference implementations. You will also be able to explain what network namespaces are and why they are important, explain what a floating IP is and how to use it, describe NAT and packet filtering including how Neutron security groups apply, and understand Open vSwitch or OVS for virtual switch functions including traffic flow within OVS.
+:::
+
+---
+
+Networking layers
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+161
+
+Neutron core services provide:
+          - Virtualization of layer 2 and 3 resources
+          - IP connectivity across different subnetworks; similar to a physical router
+Links connectivity for VMs in the compute node to the network node
+
+![Slide 161 diagram](images/slide_161_image_01.png){width="60%"}
+![Slide 161 diagram](images/slide_161_image_02.jpg){width="60%"}
+![Slide 161 diagram](images/slide_161_image_03.png){width="60%"}
+
+::: {.notes}
+First, to understand how Neutron virtualizes the network components, let’s take a look into the networking concepts. This slide shows a comparison of the architecture for the TCP/IP networking model and the OSI networking model. Both models are built with several layers.
+Neutron virtualizes the layer-2 and layer-3 communication for TCP/IP connection. In layer-2, Neutron provides a simulated connectivity  between virtual machine NICs, thus providing connectivity for VMs in the compute node to the network node. In layer-3, Neutron builds a custom routing that allows different sub‐networks to communicate, similar to a physical router.
+- In the OSI Model, layer-2 provides on-the-wire connectivity, typically using MAC addresses.
+- Devices can communicate in broadcast or receive modes within the physical network only.
+- Layer-3 provides cross-network connectivity using IP addresses and ports.
+- IP routers define how to transfer packet between the subnetworks.
+- Layer-4 provides the transport layer, with Transmission Control Protocol (TCP) the most common.
+:::
+
+---
+
+# Openstack Networks {.center}
+
+# Networking In The Large {.center}
+
+::: {.notes}
+This next section will take a look at OpenStack networking from a big picture perspective.
+:::
+
+---
+
+The big picture
+
+![Slide 163 diagram](images/slide_163_image_01.jpg){width="80%"}
+
+::: {.notes}
+A standard OpenStack networking setup has several distinct physical data center networks. They are discussed over the next several slides. This first one looks at the OpenStack API’s relationship to the controller.
+- The API network exposes all OpenStack APIs, including the OpenStack Networking API, to tenants.
+- The IP addresses on this network should be reachable by anyone on the Internet.
+- This may be the same network as the external network, as it is possible to create a subnet for the external network that uses IP allocation ranges to use only less than the full range of IP addresses in an IP block.
+- This network is considered the Public Security Domain.
+In many cases, the API network is not configured and the Management network is used instead.
+:::
+
+---
+
+The big picture
+
+![Slide 164 diagram](images/slide_164_image_01.jpg){width="80%"}
+
+::: {.notes}
+The Management network is used for internal communication between OpenStack Components. The IP addresses on this network should be reachable only within the data center and is considered the Management Security Domain. The Management network hosts traffic among the OpenStack components that manage the entire operation of the cloud infrastructure.
+:::
+
+---
+
+The big picture
+
+![Slide 165 diagram](images/slide_165_image_01.jpg){width="80%"}
+
+::: {.notes}
+The Private or Guest network hosts traffic among the virtual machines in the OpenStack cloud. This network is used as an internal network for traffic between virtual machines in OpenStack and between the virtual machines and the network nodes that provide L3 routes out to the public network.
+The private network is used for VM data communication within the cloud deployment. The IP addressing requirements of this network depend on the OpenStack Networking plug-in in use and the network configuration choices of the virtual networks made by the tenant. This network is considered the Guest Security Domain.
+:::
+
+---
+
+The big picture
+
+![Slide 166 diagram](images/slide_166_image_01.jpg){width="80%"}
+
+::: {.notes}
+The Storage network hosts traffic between the VMs and their application datasets that are on external storage systems.
+:::
+
+---
+
+The big picture
+
+![Slide 167 diagram](images/slide_167_image_01.jpg){width="80%"}
+
+::: {.notes}
+The external (public) network is used to provide VMs with Internet access in some deployment scenarios. The IP addresses on this network should be reachable by anyone on the Internet. This network is considered to be in the Public Security Domain.
+This network is connected to the controller nodes, so that users can access the OpenStack interfaces, and to the network nodes in order to provide VMs with publicly routable traffic functionality.
+:::
+
+---
+
+The big picture
+
+![Slide 168 diagram](images/slide_168_image_01.jpg){width="80%"}
+
+::: {.notes}
+Shown here, the Network Node is exposed to the internet supplying the needed internet access to the environment.
+:::
+
+---
+
+The big picture
+
+![Slide 169 diagram](images/slide_169_image_01.jpg){width="80%"}
+
+::: {.notes}
+Here’s another way to look at the OpenStack networks from a different viewpoint.
+- In this view, you can see that the Network node provides the connection to the external/public network.
+- The Management Network connects the nodes running OpenStack, in this case, the Controller, Compute, and Network nodes.
+- The API network allows the OpenStack processes running on a Controller node to be accessed from the Internet.
+- The private/internal network connects the Network and Compute nodes, and public or external connectivity is provided through the network node.
+Network provider services or SDN server/services provide additional networking services to tenant networks. These SDN services may interact with neutron-server, neutron-plugin, and plugin-agents through communication channels such as REST APIs.
+For more information on the OpenStack networking architecture, refer to documentation on docs.openstack.org.
+ https://docs.openstack.org/security-guide/networking/architecture.html
+:::
+
+---
+
+Networking recap
+
+170
+
+An installation may include the following types of networks:
+  - Management
+  - Storage
+  - Internal (private/guest)
+  - External (public)
+  - API
+Neutron’s concerned with internal & external
+Security must be considered for both during installation
+
+::: {.notes}
+To recap, an OpenStack installation may include the following types of networks:
+
+A Management network
+A storage network
+An internal or private/guest network
+An external or public network
+And an API network
+ 
+Neutron is concerned with private and external networks, however cloud installers must consider security and bandwidth requirements for all the networks.
+:::
+
+---
+
+# Network Management With Neutron {.center}
+
+What is Neutron’s job?
+
+::: {.notes}
+This next section looks at network management with Neutron. In other words, what is Neutron’s job?
+:::
+
+---
+
+Neutron allows you to virtualize network resources
+  - Networks (public/private)
+  - Subnetworks
+    - VM instances deployed to subnets
+  - Routers
+
+Overview
+
+::: {.notes}
+Neutron consists of the neutron-server, a database for persistent storage, and any number of plugin agents, which provide other services such as interfacing with native Linux networking mechanisms, external devices, or SDN controllers.
+- Neutron allows you to virtualize network resources.
+- This includes public or external networks as well as private or internal networks, also known as tenant networks.
+- It provides control plane functions (layer-2 and layer-3) - layer 2 connectivity between workloads of the same tenant plus L2 isolation between workloads of different tenants.
+- Neutron also allows virtualization of subnetworks, including VM instances deployed to subnets, and routers.
+- L3/NAT forwarding allows external network access to deployed VMs using floating IP addresses.
+Neutron provides functions for Layer 2 switching and Layer 3 routing with IP address translation via SNAT and DNAT, as well as  IP address management or IPAM. IPAM and the use of Linux namespaces provide support for overlapping IPs, which is critical if you are providing cloud services.
+Neutron allows DHCP, and its DHCP service uses dnsmasq by default. Packet filtering or firewall rules with security groups are supported. Neutron security groups behave similar to a virtual firewall at the port level.
+:::
+
+---
+
+Provides functions for
+  - Layer2 switching
+  - Layer 3 routing
+    - IP address translation (SNAT/DNAT)
+  - IP address management (IPAM)
+  - DHCP
+  - Packet filtering (firewall rules)
+  - Security groups
+
+Overview
+
+::: {.notes}
+Neutron consists of the neutron-server, a database for persistent storage, and any number of plugin agents, which provide other services such as interfacing with native Linux networking mechanisms, external devices, or SDN controllers.
+- Neutron allows you to virtualize network resources.
+- This includes public or external networks as well as private or internal networks, also known as tenant networks.
+- It provides control plane functions (layer-2 and layer-3) - layer 2 connectivity between workloads of the same tenant plus L2 isolation between workloads of different tenants.
+- Neutron also allows virtualization of subnetworks, including VM instances deployed to subnets, and routers.
+- L3/NAT forwarding allows external network access to deployed VMs using floating IP addresses.
+Neutron provides functions for Layer 2 switching and Layer 3 routing with IP address translation via SNAT and DNAT, as well as  IP address management or IPAM. IPAM and the use of Linux namespaces provide support for overlapping IPs, which is critical if you are providing cloud services.
+Neutron allows DHCP, and its DHCP service uses dnsmasq by default. Packet filtering or firewall rules with security groups are supported. Neutron security groups behave similar to a virtual firewall at the port level.
+:::
+
+---
+
+Traditional network infrastructure
+
+![Slide 174 diagram](images/slide_174_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows the infrastructure of traditional networking. In a traditional networking infrastructure, firewall, web, application, and database servers connect to a physical switch through a physical NIC or network interface card.
+:::
+
+---
+
+Virtualized network infrastructure
+
+![Slide 175 diagram](images/slide_175_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows a virtualized networking infrastructure. Virtualization is nothing but an abstraction of the operating system, application, storage or network away from the true underlying hardware or software. Virtualization creates the illusion of physical hardware to achieve the goal of operating system isolation.
+Besides virtualizing a server, many network devices must be virtualized to fully map a traditional environment to an equivalent virtual environment. These devices include virtual NICs, switches and ethernet cables.
+A hypervisor is computer software, firmware or hardware that creates and runs virtual machines. A computer on which a hypervisor runs one or more virtual machines is called a host machine, and each virtual machine is called a guest machine.
+:::
+
+---
+
+Network
+An isolated L2 segment, analogous to VLAN in the physical networking world
+Subnet
+One or more per network
+Used to allocate IP addresses when new ports are created on a network; can be automatically allocated from a predefined pool Can be entire subnet or a subset of IP address range
+VM instances are deployed to a specified subnet (default behavior)
+
+Terminology
+
+176
+
+::: {.notes}
+Here you can see some of the standard network terminology as it is used in relation to Neutron. You will need to understand this terminology as we go through this module.
+Under Neutron, a network is defined as an isolated L2 segment, analogous to VLAN in the physical networking world
+In Neutron, there are one or more subnets per network. A subnet is used to allocate IP addresses when new ports are created on a network. Those IP addresses can be automatically allocated from a predefined pool. That pool can comprise an entire subnet or a subset of an IP address range. The default behavior is that VM instances are deployed to a specified subnet. 
+When we refer to a port in Neutron, that means a connection point for attaching a single device, such as the NIC of a VM, to a virtual network. Optionally, you can specify the port when deploying a VM instance.
+A Neutron router provides virtual layer-3 services such as routing and NAT between self-service and provider networks or among self-service networks belonging to a project. Neutron uses a layer-3 agent to manage routers in network namespaces or qrouter-.
+- A security group provides definitions for virtual firewall rules that control both ingress and egress network traffic at the port level.
+- Ingress means inbound to instances, and egress means outbound from instances.
+- Neutron provides a default security group that blocks all ingress traffic to all VM instances.
+- For example, if you require SSH access to VM instances, you need to create a security group rule that allows ingress traffic to port 22.
+- Neutron security groups might be new to you, but their function likely is not.
+- Security groups provide packet filtering rules.
+:::
+
+---
+
+Port
+Connection point for attaching a single device, such as the NIC of a VM, to a virtual network.  Optionally, you can specify the port when deploying a VM instance
+Router
+Provides virtual layer-3 services such as routing and NAT between self-service and provider networks or among self-service networks belonging to a project
+Uses a layer-3 agent to manage routers in network namespaces (qrouter-)
+Security group
+Provides definitions for virtual firewall rules that control ingress (inbound to instances) and egress (outbound from instances) network traffic at the port level
+
+Terminology
+
+177
+
+::: {.notes}
+Here you can see some of the standard network terminology as it is used in relation to Neutron. You will need to understand this terminology as we go through this module.
+Under Neutron, a network is defined as an isolated L2 segment, analogous to VLAN in the physical networking world
+In Neutron, there are one or more subnets per network. A subnet is used to allocate IP addresses when new ports are created on a network. Those IP addresses can be automatically allocated from a predefined pool. That pool can comprise an entire subnet or a subset of an IP address range. The default behavior is that VM instances are deployed to a specified subnet. 
+When we refer to a port in Neutron, that means a connection point for attaching a single device, such as the NIC of a VM, to a virtual network. Optionally, you can specify the port when deploying a VM instance.
+A Neutron router provides virtual layer-3 services such as routing and NAT between self-service and provider networks or among self-service networks belonging to a project. Neutron uses a layer-3 agent to manage routers in network namespaces or qrouter-.
+- A security group provides definitions for virtual firewall rules that control both ingress and egress network traffic at the port level.
+- Ingress means inbound to instances, and egress means outbound from instances.
+- Neutron provides a default security group that blocks all ingress traffic to all VM instances.
+- For example, if you require SSH access to VM instances, you need to create a security group rule that allows ingress traffic to port 22.
+- Neutron security groups might be new to you, but their function likely is not.
+- Security groups provide packet filtering rules.
+:::
+
+---
+
+Neutron overview
+
+You can add other networking extensions, such as:
+  - Load Balance (Octavia)
+  - Firewall
+  - VPN
+Vendor plugins (drivers) can be used instead of the reference implimentations
+
+178
+
+::: {.notes}
+In Neutron, you can add other networking extensions, such as a load balancer using OpenStack Octavia, a firewall, and a VPN.
+- Neutron uses a plugin model to manifest a tenant’s logical network layout to any physical network infrastructure.
+- Neutron is vendor agnostic as far as supporting plugins with reference implementations of each.
+- Supported plugins include dnsmasq for DHCP, OVS for layer 2, NAT tables for routing, Packet filter tables for firewall, and HAProxy for load balancing.
+- Also, vendor plugins or drivers can be used instead of the reference implementations.
+- Vendor plugins can be downloaded from the OpenStack Marketplace, github, or a vendor web site.
+- Using vendor plugins allows mapping of the same logical network layout to a different or vendor specific physical network infrastructure.
+OpenStack provides default plugins, commonly referred to as reference implementations.
+:::
+
+---
+
+Neutron overview
+
+Neutron is vendor agnostic supporting plugins with reference implementations of each, such as:
+  - dnsmasq for DHCP
+  - OVS for layer 2
+  - NAT tables for routing
+  - Packet filter tables for firewall
+  - HAProxy for load balancing
+
+179
+
+::: {.notes}
+In Neutron, you can add other networking extensions, such as a load balancer using OpenStack Octavia, a firewall, and a VPN.
+- Neutron uses a plugin model to manifest a tenant’s logical network layout to any physical network infrastructure.
+- Neutron is vendor agnostic as far as supporting plugins with reference implementations of each.
+- Supported plugins include dnsmasq for DHCP, OVS for layer 2, NAT tables for routing, Packet filter tables for firewall, and HAProxy for load balancing.
+- Also, vendor plugins or drivers can be used instead of the reference implementations.
+- Vendor plugins can be downloaded from the OpenStack Marketplace, github, or a vendor web site.
+- Using vendor plugins allows mapping of the same logical network layout to a different or vendor specific physical network infrastructure.
+OpenStack provides default plugins, commonly referred to as reference implementations.
+:::
+
+---
+
+Example Neutron network
+
+![Slide 180 diagram](images/slide_180_image_01.png){width="80%"}
+
+::: {.notes}
+Here is an example of a network using Neutron. From the user standpoint, Neutron offers several network abstractions which aim to deliver the same look and feel as real resources in a datacenter, but set up for cloud instances.
+Within their quota limits, each neutron user is free to create a number of layer 2 net, assign them arbitrary IP pools, create their own router, and plug routers to external and internal cloud networks. External cloud networks are subnets within the datacenter.
+Neutron routers automatically use NAT between local addresses and external networks.
+:::
+
+---
+
+Neutron supports multiple implementations for layer 2 networking
+  - OVS – OpenvSwitch
+    - initial release in 2009
+    - Most common reference implementation
+    - Architecture requires multiple Neutron agents
+    - Includes OpenFlow software
+
+L2 reference implementations
+
+181
+
+::: {.notes}
+Neutron supports multiple reference implementations for layer 2 networking using OVS and OVN.
+OVS stands for Open vSwitch. It was initially released in 2009 and is the most common reference implementation. Its architecture requires multiple Neutron agents, and it includes OpenFlow software.
+  
+OVN stands for Open Virtual Network. OVN was initially released in 2016. It uses Open vSwitch for its switching fabric and tunnels to provide the logical/physical separation. OVN’s architecture is self-contained, eliminating many Neutron agents.
+Both OVS and OVN are open source and were developed by the same community. The presentations and labs in this course will focus on OVS.
+OVN is a newer virtual network project developed by the OVS team. It is primarily utilized by OpenStack and Kubernetes. You can use OVN to connect VMs or containers into private L2 and L3 networks quickly and programmatically without provisioning VLANs or other physical network resources.
+OVN includes logical switches and routers, security groups, and L2/L3/L4 ACLs. It is implemented using a tunnel-based overlay network with protocols such as VXLAN, NVGRE, Geneve, STT, and IPsec. OVN includes the functionality of the Neutron agents for L2, L3, DHCP, LBaaS, FWaaS, VPNaaS, and so on, thus eliminating the need for the agents.
+:::
+
+---
+
+  - OVN -- OpenVirtualNetwork
+    - initial release in 2016
+    - Uses OpenvSwitch for its switching fabric
+    - Uses tunnels to provide the logical/physical separation
+    - Architecture is self-contained, eliminating many Neutron agents
+Both, OpenvSwitch & OpenVirtualNetwork were developed by the same community
+
+L2 reference implementations
+
+182
+
+::: {.notes}
+Neutron supports multiple reference implementations for layer 2 networking using OVS and OVN.
+OVS stands for Open vSwitch. It was initially released in 2009 and is the most common reference implementation. Its architecture requires multiple Neutron agents, and it includes OpenFlow software.
+  
+OVN stands for Open Virtual Network. OVN was initially released in 2016. It uses Open vSwitch for its switching fabric and tunnels to provide the logical/physical separation. OVN’s architecture is self-contained, eliminating many Neutron agents.
+Both OVS and OVN are open source and were developed by the same community. The presentations and labs in this course will focus on OVS.
+OVN is a newer virtual network project developed by the OVS team. It is primarily utilized by OpenStack and Kubernetes. You can use OVN to connect VMs or containers into private L2 and L3 networks quickly and programmatically without provisioning VLANs or other physical network resources.
+OVN includes logical switches and routers, security groups, and L2/L3/L4 ACLs. It is implemented using a tunnel-based overlay network with protocols such as VXLAN, NVGRE, Geneve, STT, and IPsec. OVN includes the functionality of the Neutron agents for L2, L3, DHCP, LBaaS, FWaaS, VPNaaS, and so on, thus eliminating the need for the agents.
+:::
+
+---
+
+# Neutron Architecture {.center}
+
+::: {.notes}
+In this next section, we will go into more detail about Neutron’s architecture.
+:::
+
+---
+
+Neutron architecture: ML2 plugin
+
+184
+
+ML2 = Modular Layer 2
+Provides layer 2 networking
+Separates device types from vendor-specific implementations (mechanisms) to access networks
+
+![Slide 184 diagram](images/slide_184_image_01.png){width="80%"}
+
+::: {.notes}
+The Modular layer-2 (ML2) plugin is a framework allowing OpenStack networking to simultaneously utilize the variety of layer-2 networking technologies found in complex real-world data centers. ML2 provides layer 2 networking and separates network device types from vendor-specific implementations or mechanisms to access the networks.
+The ML2 framework is intended to greatly simplify adding support for new L2 networking technologies, requiring much less initial and ongoing effort than would be required to add a new monolithic core plugin. It currently works with the existing mechanism drivers for Open vSwitch, Linux bridge, SRIOV (single root input/output virtualization), MacVTap, L2 population, and hyper-v agents.
+There are two pluggable drivers for ML2.
+Network type drivers and managers provide the support for network types, such as VLAN and VXLAN. Each available network type is implemented and managed by an ML2 type driver. Type drivers maintain any needed type-specific network state and perform provider network validation and tenant network allocation.
+The ML2 plugin currently includes drivers for the local, flat, VLAN, GRE and VXLAN network types.
+The mechanism manager and drivers provide support for the implementation of vendor specific functions, such as the Cisco Nexus switch.
+- Multiple mechanism drivers can be used simultaneously to access different ports of the same virtual network.
+- Mechanism drivers can utilize L2 agents via RPC and/or use mechanism drivers to interact with external devices or controllers.
+- The mechanism driver is responsible for taking the information established by the type driver and ensuring that it is properly applied given the specific networking mechanisms that have been enabled.
+- The mechanism driver interface currently supports the creation, update, and deletion of network and port resources.
+Mechanism drivers fall into one of three categories: agent based, controller based, or switch based.
+The type and mechanism drivers are defined in the ml2_conf.ini file. For example type_drivers can be set as local, flat, vlan, gre, vxlan, or geneve while mechanism_drivers can be set as ovs, l2pop, cisco_nexus, cisco_apic, etc. 
+Check OpenStack documentation on the ml2.conf.ini file for more information.
+OpenStack Docs: ml2_conf.ini
+:::
+
+---
+
+Neutron architecture: ML2 plugin
+
+185
+
+Pluggable drivers for
+  - Network type driver, a.k.a. what type of network is supported
+    - e.g.: VLAN, VXLAN, GRE, local, flat
+  - Mechanism driver or how network type is implemented
+    - OpenvSwitch
+
+![Slide 185 diagram](images/slide_185_image_01.png){width="80%"}
+
+::: {.notes}
+The Modular layer-2 (ML2) plugin is a framework allowing OpenStack networking to simultaneously utilize the variety of layer-2 networking technologies found in complex real-world data centers. ML2 provides layer 2 networking and separates network device types from vendor-specific implementations or mechanisms to access the networks.
+The ML2 framework is intended to greatly simplify adding support for new L2 networking technologies, requiring much less initial and ongoing effort than would be required to add a new monolithic core plugin. It currently works with the existing mechanism drivers for Open vSwitch, Linux bridge, SRIOV (single root input/output virtualization), MacVTap, L2 population, and hyper-v agents.
+There are two pluggable drivers for ML2.
+Network type drivers and managers provide the support for network types, such as VLAN and VXLAN. Each available network type is implemented and managed by an ML2 type driver. Type drivers maintain any needed type-specific network state and perform provider network validation and tenant network allocation.
+The ML2 plugin currently includes drivers for the local, flat, VLAN, GRE and VXLAN network types.
+The mechanism manager and drivers provide support for the implementation of vendor specific functions, such as the Cisco Nexus switch.
+- Multiple mechanism drivers can be used simultaneously to access different ports of the same virtual network.
+- Mechanism drivers can utilize L2 agents via RPC and/or use mechanism drivers to interact with external devices or controllers.
+- The mechanism driver is responsible for taking the information established by the type driver and ensuring that it is properly applied given the specific networking mechanisms that have been enabled.
+- The mechanism driver interface currently supports the creation, update, and deletion of network and port resources.
+Mechanism drivers fall into one of three categories: agent based, controller based, or switch based.
+The type and mechanism drivers are defined in the ml2_conf.ini file. For example type_drivers can be set as local, flat, vlan, gre, vxlan, or geneve while mechanism_drivers can be set as ovs, l2pop, cisco_nexus, cisco_apic, etc. 
+Check OpenStack documentation on the ml2.conf.ini file for more information.
+OpenStack Docs: ml2_conf.ini
+:::
+
+---
+
+Neutron service plugins provide additional support for layer 3-7 services
+L3 (Routing)
+NAT table in router namespace
+Load balancer
+HAProxy (Octavia) running in amphora
+Firewall
+IP Packet filter table
+Neutron Security Groups define packet filter rules
+VPN
+Reference implementation: OpenSwan
+Can use reference implementations or vendor- specific drivers
+
+Neutron architecture: service extensions
+
+186
+
+![Slide 186 diagram](images/slide_186_image_01.png){width="80%"}
+
+::: {.notes}
+While not related to the ML2 plugin, it is important to understand the service plugins for layers 3-7.
+Neutron provides virtual networks for your cloud. There are several networking options available, called reference implementations. The Neutron architecture uses pluggable agents. The most common agents are L3 (layer‐3), DHCP (dynamic host IP addressing), and a layer‐2 (ML2) plug‐in agent.
+OpenStack networking also enables customers to create advanced virtual network topologies which may include services such as a firewall (FWaaS), a load balancer (LBaaS) implemented by the Octavia project, and a virtual private network (VPNaaS). Neutron provides a LBaaS reference implementation, using HAproxy, that can be replaced by vendor plugins, such as the F5 Networks (f5lbaas) driver.
+One of the primary points of Neutron is that it’s software defined networking. Many things that used to be done on dedicated hardware can now be virtualized using software. If you can do it using software, you can offer it as a service.
+- Neutron service plugins provide additional support for layer 3-7 services.
+- L3 is used for routing and does its reference implementation using a NAT table in router namespace.
+- The load balancer uses HAProxy (Octavia) running in amphora for reference implementation.
+- The firewall uses the IP Packet filter table while the Neutron Security Groups define packet filter rules.
+- And the VPN uses OpenSwan for reference implementation.
+Neutron allows you to use reference implementations or vendor-specific drivers.
+Service plugins are defined in neutron.conf. You can run multiple plugins. For example:  service_plugins = router, lbaasv2 sets up both router and lbaasv2 service plugins
+:::
+
+---
+
+Neutron architecture - OVS
+
+![Slide 187 diagram](images/slide_187_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram gives an overview of the Neutron component architecture.
+The neutron-server is the main API point. It handles both core and extension, that is to say API and plugin functions. It also enforces the network model and IP addressing of each port. The neutron-server and plugin agents require access to a database for persistent storage and access to a message queue for inter-communication.
+Extension plugins are used to implement routers (L3 function), LBaaS, FWaaS, VPNaaS. Quotas and security groups are also implemented as service extensions.
+The Neutron Open vSwitch (or OVS) agent is an example of an L2 agent. It manages OVS and OVS processes.
+The Neutron DHCP agent manages dnsmasq processes. It provides DHCP services to tenant networks. This agent is the same across all plugins and is responsible for maintaining DHCP configuration. The neutron-dhcp-agent requires message queue access.
+The Neutron L3 agent provides L3/NAT forwarding for external network access of VMs on tenant networks. It also requires message queue access and is optional depending on plugin.
+The Metadata server (which is not shown in this diagram) interacts with metadata from nova on provisioning to assign port and IP address for VM provisioning.
+The Service plug-ins provide or manage extra capabilities such as load balancer, firewall, or VPN support.
+Network provider services (or SDN server/services) provide additional networking services that are provided to tenant networks. These SDN services may interact with the neutron-server, neutron-plugin, and/or plugin-agents via REST APIs or other communication channels.
+ML2 plugin provides network type drivers as well as mechanism drivers. Mechanism drivers are used to implement the types of networks. As mentioned earlier, the supported network types are local, flat, VLAN, VXLAN, GRE, and Geneve.
+Local refers to a single network and can only be realized on a single host. This is only used in proof-of-concept or development environments.
+Flat refers to a single network with no segregation, meaning all servers are able to see the same broadcast traffic and can contact each other without requiring a router.
+VLAN is network segregation with VLAN and VLAN tagging and communication at L2 level (limitation of 4K VLAN IDs).
+VXLAN or Virtual Extensible LAN has the same basic function as VLAN, but it supports extended address ranges beyond VLAN limit
+GRE or Generic Routing Encapsulation is an overlay network with tunneling protocol for transporting L3 data over IP.
+Geneve stands for Generic Network Virtualization Encapsulation and is a network virtualization standard. Its purpose is to define an encapsulation data format only.
+In a multiple node implementation, assuming an Open vSwitch implementation, the Neutron-server with the L2 agents runs on the controller node; the OVS agent runs on the compute node, along with nova-compute; and Metadata, L3 (routing), DHCP, and OVS agents run on the network node.
+:::
+
+---
+
+neutron-server has multiple roles:
+API services: handles all API requests, such as, create network or allocate IP to instance
+Validates request syntax Validates token with Keystone Performs quota check
+Invokes policy based on user role
+Core (layer 2) services provided by ML2 plugin
+Extensions (layers 3-7, other services) provided by specific plugins:
+LBaaS FWaaS VPNaaS etc.
+
+Neutron-server
+
+188
+
+::: {.notes}
+The neutron-server has multiple roles.
+API services handle all API requests, such as create network or allocate IP to instance. API services validate request syntax, validates tokens with Keystone, perform quota checks, and invoke policy based on user role.
+Core (or layer 2) services are provided by ML2 plugin.
+Extensions (meaning layers 3-7 and other services) are provided by specific plugins such as LBaaS, FWaaS, VPNaaS, etc.
+:::
+
+---
+
+Neutron plugins (vendor drivers)
+
+![Slide 189 diagram](images/slide_189_image_01.jpg){width="80%"}
+
+::: {.notes}
+Neutron provides a reference implementation of the ML2 plugin, using Open vSwitch (OVS).
+The ML2 plugin allows Neutron to be vendor agnostic with regards to how the networks are implemented. Several plugins are shown on this chart which was obtained from the OpenStack website. Please check the website for the most up to date version.
+    https://www.openstack.org/marketplace/drivers/#project=neutron%20(networking) 
+There are approximately 50 plugins available from this web page. Not all are supported on Ussuri. The drivers are provided by Cisco, Extreme Networks, IBM, Huawei, VMware, Brocade, Nuage, Mellanox, to name a few contributors.
+Plugins are defined in neutron.conf. For example core_plugin = ml2, and running multiple plugins is supported.
+There are many other drivers which may be found on the OpenDev website or by contacting the vendor directly.
+https://opendev.org
+:::
+
+---
+
+ML2 deployment: OVS + vendor
+
+![Slide 190 diagram](images/slide_190_image_01.png){width="80%"}
+
+::: {.notes}
+Open vSwitch (OVS) is the reference implementation for layer 2 support. It is implemented as a daemon named ovsd and runs on the Linux platform. OVS is managed by the Neutron layer 2 OVS agent.
+:::
+
+---
+
+# Neutron Agents {.center}
+
+191
+
+IPAM
+L3 Routing DHCP
+
+::: {.notes}
+In this next section, we’ll be discussing Neutron agents. This topic includes information on IPAM, L3 Routing, and DHCP.
+:::
+
+---
+
+Example:  3 subnets -- 1 router
+
+![Slide 192 diagram](images/slide_192_image_01.png){width="80%"}
+
+::: {.notes}
+Within each individual subnet, layer 2 connectivity is available. IP addresses are assigned and tracked via IPAM using the Neutron DHCP agent, which uses dnsmasq by default. You can specify other IPAM tools as well. Each DHCP agent correlates to a specific dhcp namespace.
+To connect the subnets, as well as the public/external network (in other words, the Internet), you need a router. The Neutron L3 agent provides the routing functions. In this example, the router has four interfaces. Each router correlates to a Linux router namespace. Namespaces will be discussed soon.
+In addition, you might need to connect to one or more of the VM instances from the external/public network. This requires a floating IP address (meaning an address on the external/public network) and Neutron Security Group (or firewall) rules to control port-level access.
+:::
+
+---
+
+# Ipam & Dhcp {.center}
+
+193
+
+IP address management (IPAM) provides a pluggable service for allocating and managing
+  - Fixed IP addresses (assigned to ports of an instance)
+  - Floating IP addresses
+  - Address ranges (subnets)
+Plugins enable the integration of alternate IPAM implementations or third-party IPAM systems
+  - Integrates with DHCP and DNS services
+  - Neutron DHCP agent uses dnsmasq as its reference implementation
+
+::: {.notes}
+The IPAM subsystem in Neutron allows flexible control over the lifecycle of network resources, such as fixed IP addresses assigned to Neutron ports including DNS update, floating IP addresses, and network address ranges which are defined at the sub-network level.
+Plugins enable the integration of alternate IPAM implementations or third-party IPAM systems.
+IPAM integrates DHCP and DNS, thus allowing changes in one to be seen by the other. Note that the Neutron DHCP agent uses dnsmasq as its reference implementation
+The IP address management driver is defined in neutron.conf:
+# Neutron IPAM (that is, IP address management) driver to use. By default, the reference
+# implementation of the Neutron IPAM driver is used. (string value)
+#ipam_driver = internal
+:::
+
+---
+
+Supports creation and management of routers
+Connecting multiple networks
+  - Public (external)
+  - Private (internal)
+Each router has a unique qrouter- namespace associated with it
+Uses NAT table rules to provide router functions
+qg- interface: connects to public (external) network
+qr- interface: connects to a private (internal) network
+
+Neutron L3-agent
+
+194
+
+![Slide 194 diagram](images/slide_194_image_01.jpg){width="80%"}
+
+::: {.notes}
+The Neutron L3-Agent supports the creation and management of routers. 
+It connects multiple networks both public (or external) and private (or internal).
+Each router has a unique qrouter- namespace associated with it. The qrouter- namespace uses NAT table rules to provide router functions. qg- interface connects to a public (or external) network, and qr- interface: connects to a private (or internal) network. The NAT tables, providing the routing function for each router, reside inside the router’s namespace.
+:::
+
+---
+
+Neutron agent configuration examples
+
+![Slide 195 diagram](images/slide_195_image_01.png){width="80%"}
+
+::: {.notes}
+Here we can see a subset of the network configuration files using both ML2 mechanism drivers and ML2 type drivers.
+The ML2 mechanism drivers are OVS and l2population. L2 population is a special mechanism driver that optimizes BUM traffic in the overlay networks VXLAN and GRE. BUM stands for Broadcast, unknown destination address, multicast. It needs to be used in conjunction with either the Linux bridge or the Open vSwitch mechanism driver.
+The ML2 type driver is VLAN. There is a service plugin for the router, which is by default using namespaces and allow_overlapping_ips, and a service plugin for lbaasv2. The configuration info the lbaasv2 is in octavia.conf. IPAM is set as internal, and DHCPis set to use dnsmasq.
+:::
+
+---
+
+# Network Namespaces {.center}
+
+196
+
+What are namespaces?
+Why are they important with Neutron?
+
+::: {.notes}
+In this next section, we will explore network namespaces. We will learn what namespaces are and why they are important with Neutron.
+Namespaces are not unique to OpenStack. They are a Linux concept.
+OpenStack is designed with multi-tenancy in mind. It provides users with the ability to create and manage their own compute and network resources. Neutron supports each tenant having multiple private networks, routers, firewalls, load balancers, and other network resources.
+A network namespace is defined as a logical copy of the network stack with its own routes, firewall rules, and network interface devices. Neutron is able to provide isolated DHCP and routing services to each tenant network through the use of namespaces.
+:::
+
+---
+
+Address challenges caused by multi-tenancy Supports overlapping IP addresses
+Provides network isolation (segregation) between different tenant networks
+Each router has its own namespace
+Each subnet with DHCP has its own namespace Automatically created when network resources (subnetwork, router, load balancer) are created
+Has its own NICs, IP addresses, IP routing table, port numbers, and so on
+Separate from the global (root) namespace, which owns global routing table
+
+Network namespaces
+
+197
+
+![Slide 197 diagram](images/slide_197_image_01.png){width="80%"}
+
+::: {.notes}
+Network namespaces provide a segmentation of networking resources into different containers. The containers are created in a specialized iproute package that is installed in the network node. Namespaces are created dynamically by Neutron when you create the network resources, that is network, subnetwork, port, and router.
+- Namespaces address challenges caused by multi-tenancy.
+- They provide multiple layer-2 networks with the capability to use overlapping IP addresses and provide network isolation or segregation between different tenant (or project) networks.
+- Each namespace holds different sets of network resources.
+- Multiple layer-2 networks, separated by routing tables - allows multiple instances of routing table to coexist on network node.
+Project flows are separated by VLAN ID (subnet). Internally, this is done through OpenFlow rules.
+Neutron uses several namespaces, and each router and each subnet with DHCP has its own namespace. Core support creates a qdhcp namespace for each subnetwork and a qrouter namespace for each virtual router. Extensions create additional namespaces. For example, a qdhcp namespace is created for Octavia Load Balancer resources.
+Network namespaces are automatically created when network resources (ie, subnetwork, router, load balancer) are created. A namespace has its own NICs, IP addresses, IP routing table, port numbers, and so on. Network namespaces are separate from the global (root) namespace, which owns the global routing table. The global namespace (sometimes called the root namespace) owns the physical resources.
+The ip netns command is used to manage the namespaces.
+:::
+
+---
+
+Router namespace:
+Every neutron router has its own qrouter namespace
+Managed by L3 agent
+Name: qrouter-<router_UUID>
+DHCP namespace:
+Every subnet with DHCP enabled has its own qdhcp namespace
+Managed by DHCP agent Name: qdhcp-<network_UUID>
+
+Correlating namespaces to resources
+
+198
+
+![Slide 198 diagram](images/slide_198_image_01.png){width="80%"}
+
+::: {.notes}
+The ip netns list command displays the defined namespaces.
+- The qrouter namespace represents the virtual router, which is router1 in this example.
+- It is responsible for routing traffic to and from the virtual machine instances.
+- The qrouter namespace is created when you set the gateway interface to connect the virtual router to an external (or public) network.
+- Every neutron router has its own qrouter namespace that is managed by the L3 agent.
+- The name will be qrouter-<router_UUID>
+The qdhcp namespace provides IP addresses to the virtual machines. It listens for DHCP requests and is created when you add an interface to connect a private subnetwork to the virtual router. Every subnet with DHCP enabled has its own qdhcp that is managed by the DHCP agent. The naming convention is qdhcp- <network_UUID>
+You can execute commands in a namespace using the ip netns exec namespace_name command. Several examples of executing commands in a namespace will be discussed later in this presentation.
+Namespaces are enabled in the neutron.conf configuration file (on the compute and network nodes) by setting allow_overlapping_ips = True
+:::
+
+---
+
+Issuing commands in namespaces
+
+![Slide 199 diagram](images/slide_199_image_01.png){width="80%"}
+
+::: {.notes}
+The route -n command at the top displays the route table for the qrouter namespace. It connects the external (172) and internal (10) networks. Note that qg- refers to the external network and qr- refers to the internal network on the interface.
+The route -n command at the bottom displays the route table for the global namespace on the network node. It connects to the management network (172).
+:::
+
+---
+
+Issuing commands in namespaces
+
+![Slide 200 diagram](images/slide_200_image_01.png){width="80%"}
+
+::: {.notes}
+Here is another example of how to issue commands in namespaces.
+The ifconfig command at the top displays the interface configuration for the qrouter namespace. It ishows the external (172) and internal (10) networks.
+The qr- interface is assigned the IP address of the gateway which is defined when the private subnet is created. The gateway address is 10.0.0.1.
+The qg- interface is assigned the first available IP address in the subnet pool on the external network as defined when the public subnet is created. In this case, the address is 172.24.4.19.
+:::
+
+---
+
+EXERCISES
+
+201
+
+Work through the following lab in the exercise book:
+Lab: The Networking service (Neutron)
+
+![Slide 201 diagram](images/slide_201_image_01.png){width="80%"}
+
+::: {.notes}
+You are now ready to begin Lab 4a: The Networking service Neutron. Work through the lab by carefully following each step. You are encouraged to look back to the presentations in this module and earlier modules to refresh your memory and reinforce the concepts.
+- When deploying a new VM instance, the hypervisor creates Virtual Network Interfaces (VIFs) for it.
+- In order for network communication between VMs to function properly, VIFs of different VMs need to be wired together using virtual switches.
+- Neutron provides networking services such as L3, IP Address Management (IPAM), routing between IP subnets and to the outside world, traffic firewalls, and more.
+In networking, the description of "wiring" is referred to as "network". The IP subnets are called "subnets", and VIFs for VMs and other virtual devices are called "ports".
+The Networking service supports different plug-ins for the actual network implementation. In the vlab environment we use, the Networking supports the ML2 plug-in and Open vSwitch mechanism driver.
+Good luck with Lab 4.
+:::
+
+---
+
+# Inbound And Outbound Traffic Flow {.center}
+
+202
+
+Fixed versus floating IP addresses
+IPtables: SNAT / DNAT
+Packet filtering
+Neutron Security Groups Metadata service
+
+::: {.notes}
+It is time to look deeper into what happens with the inbound and outbound network traffic flow.
+In this section, we will discuss fixed versus floating IP addresses, IPtables: SNAT / DNAT, packet filtering, Neutron Security Groups, and the metadata service.
+As you create the network and deploy VMs, IPtable rules are automatically created and updated for SNAT and DNAT.
+Neutron security groups allow you to define rules to access deployed VMs. One example of a rule is allowing ingress traffic to flow on port 22. Security groups are used to define packet filtering rules.
+:::
+
+---
+
+Fixed IPs:
+Assigned to each instance at boot
+Private IP ranges (10.0.0.x, 192.168.0.x, etc.)
+By default, inaccessible inbound from external networks
+Can connect outbound using qg- interface (172. addr)
+Floating IPs:
+Pools of publicly routable IPs registered in OpenStack by cloud administrator Sometimes called public facing IPs
+Allocated and associated to instances by cloud users
+Provides access to instances from external networks (inbound) Uses DNAT to translate floating IP to fixed IP of instance
+Supports multiple floating IP pools, leading to different internet service providers (ISPs)
+
+IPS: fixed versus floating
+
+203
+
+::: {.notes}
+In OpenStack, there are two different types of IP addresses: fixed and floating IPs.
+- Fixed IPs are the private addresses given to an instance.
+- These allow for communication between instances, and communication to external networks.
+- Fixed IPs assigned to each instance at boot and fit within private IP ranges such as 10.0.0.x, 192.168.0.x, etc.
+- By default, these fixed IPs are inaccessible inbound from external networks, however they can connect outbound using qg- interface or the 172.
+- address range.
+- Floating IPs are public addresses that allow for external access into instances.
+- Floating IPs use pools of publicly routable IPs registered in OpenStack by the cloud administrator.
+- These are sometimes called public facing IPs.
+- Floating IPs are allocated and associated to instances by cloud users.
+- They provide access to inbound instances from external networks, and they use DNAT to translate the floating IP to a fixed IP for that instance.
+- Floating IPs support multiple floating IP pools leading to different internet service providers (ISPs).
+:::
+
+---
+
+Networks, allocation pools, etc.
+
+![Slide 204 diagram](images/slide_204_image_01.jpg){width="80%"}
+
+::: {.notes}
+Step 1: Create the private network with the allocation pool to be used for the fixed IPs assigned to the instances.
+:::
+
+---
+
+Networks, allocation pools, etc.
+
+![Slide 205 diagram](images/slide_205_image_01.jpg){width="80%"}
+
+::: {.notes}
+Step 2: Create the public network with the allocation pool to be used for the floating IPs for ingress connectivity.
+:::
+
+---
+
+Networks, allocation pools, etc.
+
+![Slide 206 diagram](images/slide_206_image_01.jpg){width="80%"}
+
+::: {.notes}
+Step 3: Create a virtual router and connect it to the private and public networks.
+:::
+
+---
+
+Networks, allocation pools, etc.
+
+![Slide 207 diagram](images/slide_207_image_01.jpg){width="80%"}
+
+::: {.notes}
+Step 4: Deploy the instance. The fixed IP is automatically assigned. In this example, it is 10.0.0.11.
+Note that the custom security group opens port 22 for SSH sessions.
+:::
+
+---
+
+Networks, allocation pools, etc.
+
+![Slide 208 diagram](images/slide_208_image_01.jpg){width="80%"}
+
+::: {.notes}
+Step 5: Allocate a floating IP to the project. In this example, a specific floating IP is requested.
+Not that if you do not specify the --floating-ip-address parameter, a floating IP is chosen randomly.
+:::
+
+---
+
+Networks, allocation pools, etc.
+
+![Slide 209 diagram](images/slide_209_image_01.jpg){width="80%"}
+
+::: {.notes}
+Step 6: Associate the floating IP to the instance.
+:::
+
+---
+
+Networks, allocation pools, etc.
+
+![Slide 210 diagram](images/slide_210_image_01.png){width="80%"}
+
+::: {.notes}
+Step 7: SSH to the instance using the floating IP.
+Note that Port 22 must be opened for packets to flow. This is defined in the custom security group and is specified on the create server request.
+:::
+
+---
+
+Each VM instance is assigned a static IP address in the private network IPtable rules are created for NAT: (stored in qrouter namespace)
+SNAT (source NAT) for outbound (egress) requests from VM
+Translate source (static) IP address in request to public IP address of the qg interface for the router DNAT (destination NAT) for inbound (ingress) requests to VM requires floating IP
+Must allocate and associate floating IP addresses to access VMs
+Translates target (floating) IP address in request to static IP address of instance Also modifies SNAT rule: public IP = floating IP
+Security Group rules needed to allow access to ports on the VMs, such as port 22 for SSH
+Creates rules (IPtables or OpenFlow tables) for packet filtering
+
+As virtual machines are deployed
+
+211
+
+::: {.notes}
+This slide provides an overview of the networking processes. It is intended for REFERENCE purposes.
+Each VM instance is assigned a static IP address in the private network. SNAT and DNAT are implemented with the nat table on the network node.  IPtables rules are created for NAT and stored in qrouter namespace. Since the NAT table is stored in the qrouter namespace, you must issue an ip netns exec command to display its rules.
+Outbound communication (from a VM) is controlled by  SNAT which stands for Source Network Address Translation.  SNAT is used for outbound or egress requests from the VM, and it translates the source or static IP address in the request to a public IP address of the qg interface for the router. SNAT requires a floating IP address and is bound by security group rules.
+- Inbound communication (to a VM) is controlled by DNAT which stands for Destination Network Address Translation.
+- DNAT is used for for inbound or ingress requests to VM.
+- It requires a floating IP as it must allocate and associate that floating IP addresses to access VMs.
+- DNAT translates the target or floating IP address in a request to the static IP address of the  instance.
+- DNAT also modifies the SNAT rule so that the public IP = the floating IP.
+Security Group rules are needed to allow access to ports on the VMs, such as port 22 for SSH. This creates rules in IPtables or OpenFlow tables for packet filtering.
+:::
+
+---
+
+User-space application program that allows a system administrator to configure tables provided by the Linux kernel firewall and the chains and rules it stores
+NAT table: For network address translation
+Filter table: For packet filtering (used only with Linux Bridge)
+Chains are a list of rules
+Might be stitched together (for example, daisy-chained) to enforce complex logics
+Rules: Each rule specifies the matching criteria of an IP packet and the action it should take
+Match: source/destination IP, source/destination port, connection state, etc. Action: ACCEPT, REJECT, DROP, LOG, DNAT, SNAT, etc
+
+IPTABLES overview
+
+212
+
+::: {.notes}
+This slide provides more details on IP tables. It is intended for REFERENCE purposes.
+IP tables use the Linux kernel firewall to route packets and translate (SNAT, DNAT) IP addresses. The user-space application program allows a system administrator to configure tables provided by the Linux kernel firewall as well as the chains and rules it stores.
+There are four built-in tables. Each contains several chains
+NAT table is used for network address translation by the network node.
+Filter table or Default IPtable is used for packet filtering. It is used on the compute node when using Linux Bridge. The default or reference implementation uses OVS for bridging. In that case, OpenFlow tables are used for packet filtering.
+Mangle table is used for packet manipulation and is not used by Neutron, and the Raw table is for configuration exemptions and is also not used by Neutron.
+Chains are a list of rules. They might be stitched together (for example, daisy-chained) to enforce complex logics. Each rule specifies the matching criteria of an IP packet and the action it should take.
+A match could be the source and destination IP, the source and destination port, the connection state, and so on.
+Actions include ACCEPT, REJECT, DROP, LOG, DNAT, SNAT, and so on.
+ACCEPT allows the packet to pass.
+REJECT disallows the packet and returns an error to the requestor.
+DROP disallows the packet and does not send a response to the requestor.
+LOG will log the packet to syslog and then continues to the next rule in the chain.
+DNAT rewrites the destination IP address or port in the packet and then continues to the next rule in the chain.
+SNAT rewrites the source IP address or port in the packet and then continues to the next rule in the chain
+.
+:::
+
+---
+
+Each router creates a unique qrouter- namespace with its own NAT table and NAT rules
+SNAT/DNAT rules are stored in the NAT table for the qrouter- namespace
+SNAT (Source NAT): egress, from private to external network DNAT (Destination NAT): ingress, from external to private network
+The following chains are used in NAT table
+  - PREROUTING chain: Alters destination IP address before routing (DNAT)
+  - POSTROUTING chain: Alters source IP address after routing (SNAT) OUTPUT chain: For locally generated IP packets
+
+IPTABLE and NAT
+
+213
+
+::: {.notes}
+Each router creates a unique qrouter- namespace with its own NAT table and NAT rules. SNAT and DNAT rules are stored in the NAT table for the qrouter- namespace. Since the NAT table is stored in the qrouter namespace, you must issue an ip netns exec command to display it. 
+SNAT is used for outbound packets and modifies the private network IP address or static address used by virtual machines when connecting to the public or external network. SNAT or Source NAT is focused on egress or traffic going from the private network to the external network.
+DNAT is used for inbound packets and modifies the public network IP address or floating IP address used to connect users to the virtual machine instance. DNAT pr Destination NAT is focused on ingress or traffic from the external network going to the private network.
+The following chains are used in NAT table:
+The PREROUTING chain alters the destination IP address before routing via DNAT.
+The POSTROUTING chain alters source IP address after routing via SNAT.
+The OUTPUT chain is used for locally generated IP packets
+:::
+
+---
+
+Instance has a fixed IP in the private network
+10.0.0.18
+Assigned by DHCP (dnsmasq)
+No floating IP
+Outbound traffic (from VM) is
+SNATed to the gateway IP address
+(qg- interface) on the external (public) network
+172.24.4.19
+NAT table resides in
+qrouter namespace
+
+Example – outbound flow: SNAT with static IP
+
+214
+
+![Slide 214 diagram](images/slide_214_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows an example of outbound flow using SNAT with a static IP address. This instance has a fixed IP in the private network that is 10.0.0.18. This IP was assigned by DHCP via dnsmasq. There is no floating IP address.
+Outbound traffic from the VM is SNATed to the gateway IP address via the qg- interface on the external or public network with the IP address 172.24.4.19. The NAT table resides in qrouter namespace
+Notice the IP addresses for the ports. On the left side of the diagram or the network node you can see that qr- is assigned the IP address of the gateway (10.0.0.1)  which is the first IP address in the private pool. qg- is assigned the first IP address in the public pool. The tap interface  is assigned the first available IP address in the private pool which is 172.24.4.19.
+- On the right side of the diagram or compute node side, you can see that each virtual machine instance has at least 1 interface (vif or eth0).
+- It is connected to the private (or tenant/data) network.
+- In the example above, its IP address is 10.0.0.18.
+- To access the external (or public) network, the 10.
+- address must be translated to a 172.
+- address.
+- Without a floating IP address, the 10.internal address is translated to the address of the qg- interface in the router namespace.
+- This is known as source NAT (or SNAT).
+dnsmasq is the default DHCP server for the tenant network; assigning fixed IP addresses to the virtual machines. When dnsmasq starts, it binds to the tap interface in the qdhcp namespace.
+:::
+
+---
+
+All instances can send outbound requests (without a floating IP) Will be routed to the qg- interface
+Translate (SNAT) fixed IP addr to qg- interface (172.24.4.198) Regardless of the (fixed) instance IP
+
+IPTABLE example: outbound (SNAT)
+
+215
+
+Chain neutron-l3-agent-snat (1 references)
+num  target     prot opt source               destination
+1    neutron-l3-agent-float-snat  all  --  0.0.0.0/0            0.0.0.0/0
+2    SNAT       all  --  0.0.0.0/0            0.0.0.0/0            to:172.24.4.198 random-fully
+3    SNAT       all  --  0.0.0.0/0            0.0.0.0/0            mark match ! 0x2/0xffff \ ctstate DNAT to:172.24.4.198 random-fully
+
+::: {.notes}
+Here we see an example of an IPTables chain for outbound or SNAT traffic. You can see on this sample table that all instances can send outbound requests without a floating IP. These requests will be routed to the qg- interface which will translate or SNAT the fixed IP addr to qg- interface (in this case 172.24.4.19) regardless of the fixed instance IP.
+:::
+
+---
+
+A floating IP is required for inbound connections
+172.24.4.21
+Floating IP is manually associated with VM
+Not assigned by DHCP
+Not visible inside VM
+Can be freed up and reused for another VM
+Floating IP is DNATed to the VM IP
+10.0.0.18
+NAT table resides in qrouter namespace
+
+E.G. – inbound flow: DNAT with floating IP
+
+216
+
+![Slide 216 diagram](images/slide_216_image_01.png){width="80%"}
+
+::: {.notes}
+Let’s take another look at the diagram we saw earlier, but this time focus on inbound flow using DNAT with a floating IP address. This instance has a floating IP which is required for inbound connections. The floating IP address in this example is 172.24.4.21
+The floating IP is manually associated with the VM. It is not assigned by DHCP and is not visible inside the VM. This IP address can be freed up and reused for another VM. As shown, the floating IP is DNATed to the VM IP address.
+Notice the IP addresses for the ports. The qr- is assigned the IP address of the gateway which is the first IP address in the private pool. qg- is assigned the first IP address in the public pool. The tap (or DHCP) is assigned the first available IP address in the private pool.
+- Each VM can optionally have an IP address on the public (or external) network.
+- The IP address is assigned manually after the VM instance is deployed.
+- This is known as a floating IP address.
+- It supports access from the public (or external) network inbound to the virtual machine instance.
+- For example, to access the VM instance with an IP address of 10.0.0.18, a floating IP of 172.24.4.21 is assigned.
+- The 172.
+- IP address is translated to the 10.
+- address.
+- This is known as destination NAT (or DNAT).
+This process allows users to access the VM instance with the 172.24.4.21 IP address. For example, they would SSH to the 172.24.4.21 address.  Note that in some implementations, such as Amazon Web Services (AWS), floating IPs are called Elastic IPs.
+:::
+
+---
+
+Inbound: Translate floating IP addr (172.24.4.21) to instance IP addr (10.0.0.18)
+
+Once associated, a new rule is created - floating IP is also used for outbound (SNAT)
+
+IPTABLE example: inbound (DNAT)
+
+217
+
+::: {.notes}
+Here in the top example, we see an example of an IPTables chain for inbound or DNAT traffic.  You can see that DNAT has translated the floating IP address (172.24.4.21) to the instance IP address (10.0.0.18).
+Once associated, a new rule is created and the floating IP is also used for outbound traffic (or SNAT).
+The information on this bottom table can be used to  verify the SNAT functions and bindings.
+:::
+
+---
+
+# Neutron Security Groups {.center}
+
+Define firewall rules for VM-VM communication, as well as ingress and egress communication
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+218
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 218 diagram](images/slide_218_image_01.jpg){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 218 diagram](images/slide_218_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+This next section covers Neutron security groups. Neutron security groups control traffic between VMs (meaning VM to VM communication) as well as, egress (or outbound traffic) and ingress (or inbound traffic).
+By default, all packets are dropped for ingress traffic. For example, if you need to SSH into a VM instance, you need to allow ingress traffic on port 22. Neutron security groups define packet filtering rules to allow connections to specific ports, such as port 22 for SSH.
+:::
+
+---
+
+Set of IP packet filter table rules; allowing packets to pass to VM instances
+Each project has a default security group, with default rules as follows:
+All egress (outbound) traffic allowed
+All VM-to-VM communication allowed
+Within VMs using same security group, by default
+All ingress (inbound) traffic dropped/blocked
+Supports IPv4 and IPv6
+You must create security group rules to allow ingress communication over specific ports
+SSH, HTTP, ping, etc.
+Only traffic that matches a security group rule is allowed. Otherwise, all traffic dropped/blocked
+Rules are "Stateful"
+Since the security group rules apply to IP (packet) filter tables, can be modified without requiring
+action against an instance
+
+Neutron Security groups
+
+219
+
+::: {.notes}
+Security groups are sets of IP packet filter table rules that are applied to VM instances. Security groups can allow traffic into a VM instance (ingress) or out of an instance (egress). They are project-specific and project members can edit the default rules for their group as well as add new rule sets.
+Each project has a default security group with default rules as follows. All egress or outbound traffic is allowed. All VM-to-VM communication is allowed within VMs using same security group. All ingress or inbound traffic is dropped or blocked. And IPv4 and IPv6 are supported.
+In essence, security groups act like a virtual firewall for your virtual machine instances, providing port-level security.
+Suppose you need to open port 22 for SSH connections into your VM instances. You have 2 choices. (1) You could update the default security group for your project to include a rule for ingress traffic on port 22, or (2) you could create a new security group and include the rule for ingress traffic on port 22.
+Note that depending on the implementation of Neutron, the packet filter rules might be defined in OpenFlow tables (meaning they are implemented in a pure OVS environment) instead of the traditional IP tables (meaning they are implemented in a hybrid environment with both OVS and Linux Bridge).
+- You must create security group rules to allow ingress communication over specific ports for SSH, HTTP, ping, and so on.
+- Only traffic that matches a security group rule is allowed.
+- All other traffic is dropped or blocked.
+- The rules are considered to be "Stateful," which means that related or established connections can still function and that connection requests are optimized, meaning that not all packets will need to pass all the way through the iptables chain.
+- Finally, since the security group rules apply to IP (packet) filter tables, they can be modified without requiring action against an instance.
+:::
+
+---
+
+Relies on Linux kernel connection tracking, conntrack
+You define 1 path for packets, conntrack maintains the response path in a separate table For example:
+You create a security group rule to allow ingress packets on port 22
+Neutron creates a rule in the IP packet filter table
+conntrack updates the conntrack table with the ingress session information
+Once the SSH session is established, conntrack updates the conntrack table with the egress session information, the response path
+The conntrack table data can be displayed by:
+conntrack –L
+cat /proc/net/ip_conntrack
+
+"Stateful" security groups
+
+220
+
+::: {.notes}
+Connection tracking (or “conntrack”) is a core feature of the Linux kernel networking stack. Conntrack allows the kernel to keep track of all logical network connections or flows, and thereby identify all of the packets which make up each flow so they can be handled consistently together.
+- With “stateful” security groups, you define one path for packets while conntrack maintains the response path in a separate table.
+- For example, you could create a security group rule to allow ingress packets on port 22.
+- Neutron would create a rule in the IP packet filter table, while conntrack would update its table with the ingress session information.
+- Once the SSH session is established, conntrack would update its table with the egress session information and the response path.
+The conntrack table data can be displayed by conntrack -L and  cat /proc/net/ip_conntrack
+Note that "Stateless" security groups are available in the Victoria release.
+Additional information can be found on the Linuxtopia.org website as well as the Debian man page for conntrack.
+    https://www.linuxtopia.org/Linux_Firewall_iptables/x1298.html 
+    https://manpages.debian.org/testing/conntrack/conntrack.8.en.html
+:::
+
+---
+
+UI: Create rule to allow ingress ssh
+
+![Slide 221 diagram](images/slide_221_image_01.png){width="80%"}
+
+::: {.notes}
+This slide shows an example of the default security group for the demo project. By default, all egress (or outbound) traffic is allowed for both IPv4 and IPv6. All VM-to-VM communication allowed within VMs using the same default security group. Notice the Remote Security Group column. And by default, all ingress (or inbound) traffic is dropped.
+To create the SSH ingress rule, Click Add Rule. This will be covered next.
+:::
+
+---
+
+UI: Create rule to allow ingress ssh
+
+![Slide 222 diagram](images/slide_222_image_01.png){width="80%"}
+
+::: {.notes}
+In order to create a rule to allow ingress SSH on the UI, click Add Rule to display. This will display the Add Rule dialog.
+Neutron provides several commonly used rules, such as SSH, ICMP, DNS, RDP, HTTP, SMTP, etc. The rules are defined in the local_settings.py configuration file for the Dashboard. An example of the pre-defined SSH rule is shown here.
+You can also define custom rules.
+To update default security group rules for the project and apply them against any running instances, click Add. The security group rules create IPtables rules and are applicable to all instances.
+All VM instances deployed using the default security group can now have ingress SSH connections.
+:::
+
+---
+
+Packet filter rules can be defined in:
+IP packet filter tables: OVS OpenFlow table rules: hybrid
+Configured in ml2_conf.ini:
+[securitygroup]
+firewall_driver = openvswitch | iptables_hybrid
+
+Configuring your firewall driver
+
+223
+
+![Slide 223 diagram](images/slide_223_image_01.jpg){width="80%"}
+
+::: {.notes}
+Historically, Open vSwitch (OVS) could not interact directly with iptables to implement security groups. Thus, the OVS agent and Compute service used a Linux Bridge called qbr- between each instance (or VM) and the OVS integration bridge called br-int in order to implement security groups. The Linux Bridge device contains the iptables packet filtering rules pertaining to the instance.
+ Packet filter rules can be defined in the IP packet filter tables via OVS and in OpenFlow table rules via hybrid using openvswitch. They are configured in ml2_conf.ini under [sml2_conf.ini as shown here where the firewall_driver is set for openvswitch and iptables_hybrid.
+Because there are additional components between instances and the physical network infrastructure, you might experience scalability and performance problems. To alleviate such problems, the OVS agent includes an optional firewall driver that natively implements security groups as flows in OVS rather than Linux bridge and iptables. This can increase scalability and performance.
+The native OVS firewall implementation requires kernel and user space support for conntrack. Note that this requires a minimum version of Linux kernel 4.3 and Open vSwitch version 2.5 or newer.
+:::
+
+---
+
+Openflow rule: allow ingress traffic port 22
+
+![Slide 224 diagram](images/slide_224_image_01.jpg){width="80%"}
+
+::: {.notes}
+THIS SLIDE IS FOR REFERENCE
+The flow table in OpenFlow switches plays a critical role in OpenStack networking. The flow table stores the rules (as populated by the OpenFlow controllers) for controlling and directing the packet flows.
+The Output action forwards a packet to a specified OpenFlow port. In this example, packets for established and new connections on port 22 are routed to OpenFlow port 43. The rule for port 43 forwards packets to the tap interface of the VM. In this example, the ID of the port on the VM begins with “7571157f-bc.”
+You can see the tap interface ID if you issue an openstack port list command
+Note that these flows are defined in table 82. Table 82 accepts established and related connections. OpenFlow supports many tables. A packet might be routed through multiple tables. If the packet is not routed, it is dropped, by default.
+To learn more about OpenFlow, see this post covering “OpenFlow - Basic Concepts and Theory” on Overlaid.
+    https://overlaid.net/2017/02/15/openflow-basic-concepts-and-theory/ 
+For more details on Neutron and OpenFlow rules see the OpenStack.org documentation.
+ https://docs.openstack.org/neutron/ussuri/contributor/internals/openvswitch_firewall.html
+:::
+
+---
+
+# Metadata Service {.center}
+
+::: {.notes}
+This next section will address Neutron’s metadata service.
+:::
+
+---
+
+Metadata service allows VM instances to retrieve instance-specific data
+Public SSH keys, user data, init scripts, and so on Reachable at http://169.254.169.254:80
+Neutron metadata service is a proxy - implemented by nova-api at port 8775
+
+Metadata service - overview
+
+226
+
+::: {.notes}
+How do you get from 169.254.169.254 on port 80, to the nova-api on the controller node, port 8775?
+The Neutron Metadata service allows VM instances to retrieve instance-specific data such as public SSH keys, user data, init scripts, and so on. These are reachable at http://169.254.169.254:80. Neutron metadata service is a proxy. It is implemented by nova-api at port 8775.
+:::
+
+---
+
+VM sends metadata request to http://169.254.169.254:80
+Outbound requests are routed to default gateway on Neutron router (qg- port of the qrouter namespace)
+NAT table redirects the request from TCP port 80 to port 9697
+Neutron metadata proxy listens on port 9697 in the qrouter namespace
+Neutron metadata proxy relays the request to nova-api, at port 8775, based on configuration file:
+
+nova.conf:
+## metadata_agent.ini ## nova_metadata_host = <host_ip_addr> nova_metadata_port = 8775
+
+Metadata service - flow
+
+227
+
+::: {.notes}
+- Here you can see the flow of the metadata service.
+- First, VM sends a metadata request to http://169.254.169.254:80.
+- Next, outbound requests are routed to the default gateway on the Neutron router which will be the qg- port of the qrouter namespace.
+- After that, the NAT table redirects the request from TCP port 80 to port 9697.
+- The Neutron metadata proxy listens on port 9697 in the qrouter namespace.
+Finally, the Neutron metadata proxy relays the request to nova-api, at port 8775, based on configuration file:
+The NAT table rule to redirect the requests from port 80 to port 9697:
+Chain neutron-l3-agent-PREROUTING (1 references)num pkts bytes target prot opt in out source destination1 393 23580 REDIRECT tcp -- qr-+ * 0.0.0.0/0 169.254.169.254 tcp dpt:80 redir ports 9697
+We can see in this example that the iptables prerouting chain is redirecting the traffic to the qr- router and forwarding requests made to port 80 to  port 9697.
+:::
+
+---
+
+Instances can retrieve the public SSH key (identified by keypair name when a user requests the new instance) by making a GET request to the metadata service.
+For example:
+
+$ curl http://169.254.169.254/2009-04-04/meta-data/public-keys/0/openssh-key
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDYVEprvtYJXVOBN0XNKVVRNCRX6BlnNbI+US\
+LGais1sUWPwtSg7z9K9vhbYAPUZcq8c/s5S9dg5vTHbsiyPCIDOKyeHba4MUJq8Oh5b2i71/3B\ ISpyxTBH/uZDHdslW2a+SrPDCeuMMoss9NFhBdKtDkdG9zyi0ibmCP6yMdEX8Q== Generated\
+by Nova
+
+Metadata example
+
+228
+
+::: {.notes}
+Instances can retrieve the public SSH key which is identified by keypair name when a user requests the new instance. They can be retrieved by making a GET request to the metadata service.
+In this example, the curl command was directed to retrieve the SSH public key, as evidenced by the command output.
+For more information on the OpenStack metadata service, check the OpenStack information about metadata-service.
+    https://docs.openstack.org/nova/ussuri/user/metadata-service.html
+:::
+
+---
+
+# Neutron With Ovs {.center}
+
+# (Open Vswitch) {.center}
+
+::: {.notes}
+In this next section, we will learn about Neutron with Open vSwitch or OVS. Open vSwitch is the default (also known as the reference implementation) for Neutron layer 2 networking.
+More information can be found on the Open vSwitch.org website.
+https://www.openvswitch.org/
+:::
+
+---
+
+# Ovs Architecture {.center}
+
+::: {.notes}
+THIS SLIDE IS FOR REFERENCE
+This diagram illustrates many of the OVS components such as ovs-vswitchd, ovs-vsctl, and ovs-ofctl. It also shows several DB processes. ovs-vswitchd is the primary process (or daemon) for OVS.
+- VMs connect to the eth ports in the physical space as shown at the bottom of the diagram.
+- The VMs must be running in promiscuous mode.
+- In promiscuous mode, a network adapter does not filter packets.
+- Each network packet on the network segment is directly passed to the operating system or a monitoring application.
+- Note that the packet data is also accessible by any virtual machine (VM) or guest operating system running on the host system.
+In the labs, you use the ovs-vsctl command to create and manage bridges (or virtual switches) and their ports (or vEth ports).
+In an environment using only Open vSwitch, without Linux Bridges, you might also need to become familiar with ovs-ofctl and ovs-dpctl commands to view the data packets and flows.
+:::
+
+---
+
+OVS is a reference implementation used by the ML2 plugin
+Open vSwitch (OVS) is an open source, industry standard, that supports the necessary layer 2 network types
+FLAT: Networks share one layer 2 domain
+VLAN: Networks are separated by 802.1Q VLANs
+TUNNEL: Traffic is carried over GRE/VXLAN with different per-net tunnel IDs
+OVS also includes OpenFlow
+
+Open vSwitch plugin
+
+231
+
+::: {.notes}
+OVS is a reference implementation used by the ML2 plugin that allows you to separate tenant traffic in three ways - FLAT, VLAN, and TUNNEL.
+FLAT is just like bridging. In this case, networks share one layer 2 domain.
+VLAN is 802.1Q VLANs With VLAN, networks are separated by 802.1Q VLANs.
+TUNNEL is used to tunnel connections between compute nodes with different tunnel_IDs for each network (which is an openvswitch concept based on FC 2890). With TUNNEL traffic is carried over GRE/VXLAN with different per-net tunnel IDs.
+Each of these modes is useful in its own way. FLAT allows you to bridge networks together. VLAN allows you to segregate networks from one another with rules that govern the accesses allowes. TUNNEL is used to connect networks together, but it can also encrypt that traffic to protect the data flows.
+ 
+Open vSwitch (OVS) is an open source, industry standard, that supports the necessary layer 2 network types. It also supports OpenFlow.
+:::
+
+---
+
+Example network with OVS
+
+![Slide 232 diagram](images/slide_232_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows an example of the Network and Compute nodes connected through the br-tun OVS bridge (and eth2 port) and the private network.
+A VM has been deployed to the Compute node on the left side of the diagram. This creates a tap interface to connect the VM to the OVS br-int.
+Remember what each agent manages. The OVS agent interfaces with the OVS daemon (ovs-vswitchd) to manage OVS bridges and v-eth pairs. The L3 agent manages qrouter namespace, including qr- and qg- interfaces. And the DHCP agent manages the qdhcp namespace, including the tap interface.
+The qrouter namespace name is derived from qrouter-, and the qdhcp namespace name is derived from qdhcp-
+To find out where the various UUIDs came from, you can issue a neutron port-list command to display all of the interfaces (meaning tap, qr-, qg-, and VM).
+openstack port list (modified)
+ID | Fixed IP Addresses06d6a361-1843-4796-a558-acd7344775ef | ip_address='192.168.0.2' : DHCP interface : tap-06d6a361-18 : lb-mgmt0c3b6d44-b7bd-4b37-ba7a-ba0e32e7e208 | ip_address='172.24.4.19' : router gateway : qg-0c3b6d44-b7 : router119c1c2f8-9443-47c3-a16d-efe69f799ad5 | ip_address='10.0.0.1' : router interface: qr-19c1c2f8-94 : router12f92c654-391d-45ac-aa60-debf62d967d2 | ip_address='172.24.4.21' : floating IP :7571157f-bcad-4032-8ad1-f0950600b737 | ip_address='10.0.0.18' : VM instance : tap-7571157f-bca87559e9-77eb-492d-aa55-1c7fcdc67587 | ip_address='192.168.0.18' : LB health mon : o-hm0f6861ba1-6a96-4e74-a2c9-e41c6ee5ef8f | ip_address='10.0.0.2' : DHCP interface : tap-f6861ba1-6a : private
+- In this example, we can gather many details about our ports in OpenStack.
+- We can confirm the id, IP, name, and interface for each port.
+- Notice the IP addresses for the ports.
+- Remember, qr- is assigned the IP address of the gateway (the first IP address in the private pool).
+- qg- is assigned the first IP address in the public pool.
+- And tap (DHCP) is assigned the first available IP address in the private pool.
+:::
+
+---
+
+OVS plugin: vlan
+
+![Slide 233 diagram](images/slide_233_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows three compute nodes, each running vm instances belonging to 2 tenants - NET1 and NET2 VLANs. In VLAN mode, traffic is separated by standard 802.1q vlan tags. Using VLANs does have a limitation of slightly over 4000 VLAN IDs maximum.
+- Since we have a single bridge to serve potentially multiple tenants, there must be a way to separate tenant traffic on the bridge.
+- The OVS plugin uses "Local vlans" that are internal to OVS, such as LV_1 and LV_2 as shown on this slide.
+- These "local vlans" exist only inside a given compute node for OVS and are not carried outside.
+- For passing traffic between different compute nodes they are stripped and converted to "global VLAN ids”, or tunnel IDs, depending on the mode used, as shown next.
+:::
+
+---
+
+Local VLAN tag changed to "global" VLAN tag, also called “segmentation” VLAN ID
+
+Local vs global traffuc IDs: vlan mode
+
+234
+
+![Slide 234 diagram](images/slide_234_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows how local and global traffic IDs are used In VLAN mode,
+For outbound requests, the local vlan ID tags (for example, LV_1) are converted to "global" vlan ID tags which correspond to those assigned to a given network by the Neutron administrator. The conversion is done by the “ethernet bridge.”
+For inbound requests, the “global” vlan tag is reconverted back to the local vlan tag (LV_1) in the integration bridge (br-int).
+Local VLAN tag changed to a "global" VLAN tag is also called a “segmentation” VLAN ID.
+:::
+
+---
+
+OVS plugin: vxlan tunnel
+
+![Slide 235 diagram](images/slide_235_image_01.png){width="80%"}
+
+::: {.notes}
+This example of VXLAN is similar to how VLAN works except that a mesh of GRE tunnels (point-to-point) is created between hypervisor bridge br-tun IFs.
+In this case, networks are separated using "tunnel IDs".
+:::
+
+---
+
+Local VLAN tag changed to Vxlan tunnel ID
+
+Local vs global traffic IDs: tunnel mode
+
+236
+
+![Slide 236 diagram](images/slide_236_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram is very similar to the one describing the local VLAN process. With tunneling, the local vlan IDs are converted to GRE tunnel IDs by OVS in the “tunnel” bridge (for outbound requests) and reconverted by the integration bridge (for inbound requests).
+:::
+
+---
+
+Compute node - open vSwitch details - hybrid
+
+![Slide 237 diagram](images/slide_237_image_01.png){width="80%"}
+
+::: {.notes}
+Neutron delegates the implementation detail and actual layout of the networking to its plugins. This example shows a hybrid environment which is running both OVS and Linux Bridge for the virtual switch support.
+In this diagram, we see three different types of virtual networking devices: TAP, VLAN, and Linux Bridge.
+TAP devices are created by virtualization platforms such as KVM and Xen on the host systems. A frame sent from eth interface in a virtual machine is received by a tap device on the host system. TAP devices typically show up as vnetX devices.
+A VLAN device gets associated with a VLAN ID. It takes care of tagging traffic to a VLAN as it leaves the system, and it untags traffic as it is sent into the system. VLAN devices get attached to the physical NIC that communication is occurring on.
+A Linux bridge (or QBR) acts as a simple software switch. Anything that comes into the bridge is sent to a different device that has been connected to the Bridge. Each VM has a unique Linux Bridge created for it to connect to the br-int.
+:::
+
+---
+
+# Overlay Networks {.center}
+
+::: {.notes}
+This next section will cover overlay networks. Overlay networking (sometimes called an SDN overlay) is a method of using software to create layers of network abstraction that can be used to run multiple separate and discrete virtualized network layers on top of the physical network. This often provides new application security benefits.
+Network overlays can dramatically increase the number of virtual subnets that can be created on a physical network. This in turn supports multitenancy and virtualization features. In other words, the number of traditional VLANs can be exhausted quickly. Network overlays work to combat this.
+:::
+
+---
+
+VLAN networks have a restriction of 4096 VLAN IDs
+
+Problem for many cloud implementations, especially service providers Solution: L2 over L3 tunneling
+Segments the network using L3 packets
+
+Vlan vs overlay networks scalability
+
+239
+
+::: {.notes}
+One challenge with VLAN networks is that due to the number of ID bits, the maximum number of  VLAN networks is 4096. VXLAN (or Virtual Extensible LAN) has over 16 million, GRE (or Generic Routing Encapsulation) has over 4 billion, and with 64 bit IDs, the scalability of STT (or Stateless Transport Tunneling Protocol) networks is virtually unlimited.
+The limits with VLAN scalability can be a problem for many cloud implementations, especially service providers. The solution is to implement L2 over L3 tunneling. This involves segmenting the network using L3 packets.
+- All three protocols -VXLAN, GRE, and SSR - work by encapsulating a payload inside an outer IP packet.
+- A payload is an inner packet that needs to be delivered to a destination network.
+- The tunnel endpoints send payloads through the tunnels by routing encapsulated packets through intervening IP networks.
+- Other IP routers along the way do not parse the payload (that is, the inner packet).
+- They only parse the outer IP packet as they forward it towards the tunnel endpoint.
+There are other tunnel protocols not discussed in this lecture, such as NVGRE (or Network Virtualization using Generic Routing Encapsulation) and GENEVE (or Generic Network Virtualization Encapsulation).
+:::
+
+---
+
+What is vxlan?
+
+As described in RFC 7348:
+Virtual eXtensible Local Area Network (VXLAN) … is used to address the need for overlay networks within virtualized data centers accommodating multiple tenants. The scheme and the related protocols can be used in networks for cloud service providers and enterprise data centers.
+
+240
+
+::: {.notes}
+As described in Request For Comments 7348 from the IETF or Internet Engineering Task Force, VXLAN or Virtual eXtensible Local Area Network “… is used to address the need for overlay networks within virtualized data centers accommodating multiple tenants. The scheme and the related protocols can be used in networks for cloud service providers and enterprise data centers.”
+The explanation found on Wikipedia might make more sense:
+- Virtual Extensible LAN ([or] VXLAN) is a network virtualization technology that attempts to address the scalability problems associated with large cloud computing deployments.
+- It uses a VLAN-like encapsulation technique to encapsulate OSI layer 2 Ethernet frames within layer 4 UDP datagrams, using 4789 as the default IANA-assigned destination UDP port number.
+- VXLAN endpoints, which terminate VXLAN tunnels and may be either virtual or physical switch ports, are known as VXLAN tunnel endpoints ([or] VTEPs).
+For more information, see the Wikipedia article or the full RFC.
+https://en.wikipedia.org/wiki/Virtual_Extensible_LAN 
+https://tools.ietf.org/html/rfc7348
+:::
+
+---
+
+Tunneling protocol initially developed by Cisco, Arista, VMware, and others Lays on top of the physical network - also known as a network overlay Designed to use existing networking infrastructure
+Expands a single layer 2 network over layer 3 Ideal for virtualized environments
+Allows for dynamic changes to be performed programmatically Underlying physical network need not be changed/re-configured
+
+What is vxlan?
+
+241
+
+::: {.notes}
+- To recap or restate in simpler terms, VXLAN is a tunneling protocol that was initially developed by Cisco, Arista, VMware, and others.
+- It lays on top of the physical network, which is also known as a network overlay.
+- VXLAN is designed to use the existing networking infrastructure.
+- It expands a single layer 2 network over layer 3.
+- It is ideal for virtualized environments as it allows for dynamic changes to be performed programmatically and because the underlying physical network need not be changed/re-configured.
+:::
+
+---
+
+Addresses limitations of STP and VLAN ranges
+12-bit field for VLAN sets upper limit of tenant networks to 4096
+Designed from the ground up with multi-tenant environments in mind Addresses inadequate table sizes at top of the rack (ToR) switch
+In virtualized environments, ToR switch(es) need to maintain table entries for MAC addresses for all physical and virtual servers
+If tables overflow, switch may stop learning addresses causing significant flooding of subsequent frames
+
+Why vxlan?
+
+242
+
+::: {.notes}
+So why would you want to use VXLAN? There are a number of reasons.
+First, it addresses the limitations of STP and VLAN ranges caused by the 12-bit field for VLAN which sets the upper limit of tenant networks to 4096.
+Second, it is designed from the ground up with multi-tenant environments in mind.
+Finally, VXLAN addresses inadequate table sizes at top of the rack (or ToR) switch. In virtualized environments, ToR switches need to maintain table entries for MAC addresses for all physical and virtual servers. If tables overflow, a switch may stop learning addresses thus causing significant flooding of subsequent frames.
+For details on the areas that VXLAN is intended to address, see Section 3 of RFC 7348.
+https://tools.ietf.org/html/rfc7348#section-3
+:::
+
+---
+
+Layer 2 over layer 3
+
+![Slide 243 diagram](images/slide_243_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram provides more details about layer 2 over layer 3.
+The outer destination MAC address in this frame may be the address of the target VTEP or of an intermediate Layer 3 router.
+Outer IP Header is the outer IP header with the source IP address indicating the IP address of the VTEP over which the communicating VM (as represented by the inner source MAC address) is running. When it is a unicast IP address, it represents the IP address of the VTEP connecting the communicating VM as represented by the inner destination MAC address. 
+Outer UDP Header refers to the outer UDP header with a source port provided by the VTEP and the destination port being a well-known UDP port.
+Destination Port: IANA has assigned the value 4789 for the VXLAN UDP port, and this value SHOULD be used by default as the destination UDP port. Some early implementations of VXLAN have used other values for the destination port. To enable interoperability with these implementations, the destination port SHOULD be configurable.
+- Source Port: It is recommended that the UDP source port number be calculated using a hash of fields from the inner packet -- one example being a hash of the inner Ethernet frame's headers.
+- This is to enable a level of entropy for the ECMP/load-balancing of the VM-to-VM traffic across the VXLAN overlay.
+- Per RFC 6335, when calculating the UDP source port number in this manner, it is RECOMMENDED that the value be in the dynamic/private port range 49152-65535.
+- UDP Checksum SHOULD be transmitted as zero.
+- When a packet is received with a UDP checksum of zero, it MUST be accepted for decapsulation.
+- Optionally, if the encapsulating end point includes a non-zero UDP checksum, it MUST be correctly calculated across the entire packet including the IP header, UDP header, VXLAN header, and encapsulated MAC frame.
+- When a decapsulating end point receives a packet with a non-zero checksum, it MAY choose to verify the checksum value.
+- If it chooses to perform such verification, and the verification fails, the packet MUST be dropped.
+- If the decapsulating destination chooses not to perform the verification, or performs it successfully, the packet MUST be accepted for decapsulation.
+VXLAN Header: This is an 8-byte field that has:
+Flags (8 bits): where the I flag MUST be set to 1 for a valid VXLAN Network ID (VNI). The other 7 bits (designated "R") are reserved fields and MUST be set to zero on transmission and ignored on receipt.
+VXLAN Segment ID or VXLAN Network Identifier: The VXLAN Network Identifier or VNI is a 24-bit value used to designate the individual VXLAN overlay network on which the communicating VMs are situated. VMs in different VXLAN overlay networks cannot communicate with each other.
+And Reserved fields (24 bits and 8 bits). Reserved fields MUST be set to zero on transmission and ignored on receipt.
+:::
+
+---
+
+# Neutron Qos (Quality Of Service) Considerations {.center}
+
+FOR EXAMPLE, IMPLEMENTING BANDWIDTH LIMITS
+
+::: {.notes}
+This lesson introduces Neutron Quality of Service (QOS).
+:::
+
+---
+
+Normally, without network QoS management, all traffic is transmitted in a “best-effort” manner, making it impossible to guarantee service delivery to customers
+With QoS
+Devices such as switches and routers can mark traffic
+Allows it to be handled with a higher priority; enabling you to fulfill the QoS conditions agreed under a SLA Also known as Neutron bandwidth limits
+Use case: network traffic such as Voice over IP (VoIP) and video streaming needs to be transmitted with minimal bandwidth constraints
+QoS is an advanced service plugin; configured as a ML2 service extension driver
+Requires admin role
+
+Neutron QOS - overview
+
+245
+
+::: {.notes}
+Let’s start with an overview of Neutron Quality of Service or QoS.
+Normally, without network QoS management, all traffic is transmitted in a “best-effort” manner. This makes it impossible to guarantee service delivery to customers.
+With QoS, devices such as switches and routers can mark traffic. This allows traffic to be handled with a higher priority, thus enabling you to fulfill the quality of service conditions agreed to under a service level agreement or SLA. You might also see Neutron QoS referred to as Neutron bandwidth limits
+One example of a use case would be network traffic such as Voice over IP (VoIP) and video streaming needing to be transmitted with minimal bandwidth constraints.
+QoS is an advanced service plugin. It is configured as a ML2 service extension driver and requires an admin role to administer.
+:::
+
+---
+
+Supported QoS rule types are:
+bandwidth_limit: Set bandwidth limitations on networks, ports, or floating IPs Applied to ingress and egress traffic
+dscp_marking: Marking network traffic with a DSCP (Differentiated Services Code Point) value
+Applied to egress traffic only
+minimum_bandwidth: Minimum bandwidth constraints on certain types of traffic Applied to ingress and egress traffic
+There are several configuration tasks, to enable QoS:
+
+neutron.conf:
+[DEFAULT]
+service_plugins = router,qos
+
+ml2_conf.ini:
+[ml2]
+extension_drivers = port_security,qos
+
+openvswitch_agent.ini:
+[agent] extensions = qos
+
+Keep going, that's just the start
+
+QOS rule types
+
+246
+
+::: {.notes}
+Neutron supports three types of QoS policy rules, as shown here. Each rule is applied to ingress or egress direction. Also shown here are the beginning config definitions. 
+Supported QoS rule types are:
+bandwidth_limit: This rule type sets bandwidth limitations on networks, ports, or floating IPs. bandwidth_limit applies to ingress and egress traffic
+dscp_marking: This rule type is for marking network traffic with a DSCP (or Differentiated Services Code Point) value. dscp_marking is applied to egress traffic only.
+minimum_bandwidth: This sets minimum bandwidth constraints on certain types of traffic. minimum_bandwidth applies to ingress and egress traffic.
+You can configure several options across multiple config files.
+There are several configuration tasks to enable QoS as shown here.
+ 
+In the neutron.conf, add router and qos to service_plugins under [DEFAULT] to enable the floating IP QoS extension qos-fip.
+Under the ml2_conf.ini, add port_security and qos to extension_drivers under [ml2].
+And in the openvswitch_agent.ini, set the extensions to include qos in the [agent] section of the configuration file. The agent configuration file will reside in /etc/neutron/plugins/ml2/<agent_name>_agent.ini where agent_name is the name of the agent being used (for example openvswitch).
+You might need to update the policy files and create a QoS endpoint. Coming up, we will go over how to define a QoS policy and apply it to a network.
+That's just the start. For more information on QoS, see the OpenStack documentation.
+    https://docs.openstack.org/neutron/ussuri/admin/config-qos.html
+:::
+
+---
+
+Manage QoS policy: openstack ...
+network qos policy create network qos policy delete network qos policy list network qos policy set network qos policy show
+
+Manage QoS rules: openstack ...
+network qos rule create network qos rule delete network qos rule list network qos rule set network qos rule show network qos rule type list network qos rule type show
+
+QOS commands
+
+::: {.notes}
+Here you can see the CLI commands for QoS policies and rules. Since QoS relates to networking, it is a subcommand of the openstack network command. QoS policy commands include create, delete, list, set, and show. Rule commands are create, delete, list, set, show, type list, and type show.
+:::
+
+---
+
+Define the QoS policy:
+openstack network qos policy create bw-limiter
+Define QoS policy bandwidth limit rules:
+
+openstack network qos rule create --type bandwidth-limit \
+
+--egress
+
+--max-kbps 3000 --max-burst-kbits 2400	bw-limiter
+
+openstack network qos rule create --type bandwidth-limit \
+
+--ingress
+
+--max-kbps 10000 --max-burst-kbits 10000	bw-limiter
+
+Associate the QoS policy with the private network:
+openstack network set --qos-policy bw-limiter private
+
+QOS example
+
+248
+
+::: {.notes}
+Here you can see how to define and implement QoS, in this case applying it to a single network. This is one option. For example, you might choose to associate the bandwidth limit at the port level.
+You can define a single rule or combine several rules in one policy, as shown on this slide. It is acceptable as long as the type or direction of each rule is different.
+In this example, we have defined the Qos policy with the command openstack network qos policy create bw-limiter
+Next, we defined the Qos policy bandwidth limit rules with a maximum of 3000 kbps and maximum burst of 2400 kbps on egress. The limits on ingress are 10000 kbps maximum and 10000 kbps maximum burst.
+:::
+
+---
+
+# Neutron Quotas {.center}
+
+::: {.notes}
+This lesson introduces Neutron (networking) quotas.
+:::
+
+---
+
+Neutron supports quotas for the following:
+Floating IPs: Number of floating IPs allowed per project Networks: Number of networks allowed per project Ports: Number of ports allowed per project
+Routers: Number of routers allowed per project
+Security Groups: Number of security groups allowed per project Security Group Rules: Number of security rules allowed per project Subnets: Number of subnets allowed per project
+Subnet Pools: Number of subnet allocation pools allowed per project
+Default quotas are defined in neutron.conf
+A value of -1 means unlimited
+Quotas are enforced by neutron-server, when processing a request
+
+Neutron quotas - overview
+
+250
+
+::: {.notes}
+Neutron supports quotas allowed per project for the following: the number of floating IPs, the number of networks, the number of ports, the number of routers, the number of security groups, the number of security group rules, the number of subnets, and the number of subnet allocation pools.
+Default quotas are defined in neutron.conf. A value of -1 means unlimited. Quotas are enforced by neutron-server when processing a request.
+:::
+
+---
+
+neutron.conf:
+
+[quotas]
+#quota_network = 100
+#quota_subnet = 100
+#quota_port = 500
+#quota_router = 10
+#quota_floatingip = 50
+#quota_security_group = 10
+#quota_security_group_rule = 100
+
+Display the default quotas:
+
+stack@vlab:~/devstack$ openstack quota list --network
++--------------------+--------------+----------+-------+---------------+---------+-----------------+----------------------+---------+--------------+
+| Project ID         | Floating IPs | Networks | Ports | RBAC Policies | Routers | Security Groups | Security Group Rules | Subnets | Subnet Pools |
++--------------------+--------------+----------+-------+---------------+---------+-----------------+----------------------+---------+--------------+
+| 7add63857e7543e8a3 |           50 |      100 |   500 |            10 |      10 |             100 |                 1000 |     100 |           -1 |
+| 7be9e331ce5b82     |              |          |       |               |         |                 |                      |         |              |
++--------------------+--------------+----------+-------+---------------+---------+-----------------+----------------------+---------+--------------+
+
+There is no quota for subnet pools; it defaults to unlimited (-1)
+
+Neutron default quotas
+
+251
+
+::: {.notes}
+The quota defaults in neutron.conf are shown here. As shown by the command openstack quota list --network, the default quotas are associated with the admin project.
+Note that there is no quota for subnet pools. The default for that is (-1).
+:::
+
+---
+
+Unless overriden, projects use the default quotas
+To change/set the Subnet Pools quota for the demo project:
+
+openstack quota set --subnetpools 2 demo <no response>
+
+Display the quotas for the demo project:
+
+The demo project inherits default quotas from neutron.conf
+
+Define project quota
+
+252
+
+openstack quota show --network demo
++----------------+-------+
+| Resource       | Limit |
++----------------+-------+
+| networks       |   100 |
+| ports          |   500 |
+| rbac_policies  |    10 |
+| routers        |    10 |
+| subnets        |   100 |
+| subnet_pools   |     2 |
+| floating-ips   |    50 |
+| secgroup-rules |   100 |
+| secgroups      |    10 |
++----------------+-------+
+
+::: {.notes}
+Unless overridden, projects will use the default quotas. To change or set quotas for the Subnet Pools on the demo project, you would use the command openstack quota set --subnetpools 2 demo
+<no response>
+To display the quotas for the demo project, use the command openstack quota list --network
+As you can see, unless specified, the demo project inherits default quotas from neutron.conf. As mentioned earlier, there is no default quota for subnet pools. This example sets the subnet pools quota to 2.
+Notice that the demo project is listed on a separate line due to quota overrides. In this situation, the security groups quota is set to the default value of 10. It had been 100. The security group rules quota is set to the default value of 100. It had been 1000.
+:::
+
+---
+
+SUMMARY
+
+::: {.notes}
+Let’s do a quick summary of what we’ve learned about Neutron before starting the lab exercises.
+:::
+
+---
+
+Neutron hardware diversity support
+
+![Slide 254 diagram](images/slide_254_image_01.png){width="80%"}
+
+::: {.notes}
+Here you can see the wide range of data center hardware that is supported by Neutron. Neutron is able to deliver virtual networks on top of hardware from Nicira, Open vSwitch, PaloAlto Networks, F5, Cisco, OpenFlow, Arista, and more. Neutron can create DC networks, DC DMZ, and Remote DC tunnels to connect VMs.
+:::
+
+---
+
+You should now be able to:
+Explain Neutron architecture and plugin support
+Modular Layer (ML2) type and mechanism drivers Agents: IPAM, L3, DHCP
+Reference implementations
+Explain what network namespaces are and why they are  important
+Explain what a floating IP is and how to use it
+Describe NAT and packet filtering, including how Neutron security groups apply
+Understand Open vSwitch (OVS) for virtual switch functions, including traffic flow within OVS
+
+Summary
+
+255
+
+::: {.notes}
+- At this point you should be able to explain Neutron architecture and plugin support including the Modular Layer (or ML2) type and its mechanism drivers; the IPAM, L3, and DHCP agents; and reference implementations.
+- You should understand what network namespaces are and why they are important.
+- You should be able to explain what a floating IP is and how to use it.
+- You should understand and be able to describe NAT and packet filtering, as well as how Neutron security groups apply.
+- And finally, you should understand Open vSwitch (or OVS) for virtual switch functions, including traffic flow within OVS.
+:::
+
+---
+
+Neutron summary
+
+![Slide 256 diagram](images/slide_256_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows how the various components that make up Neutron such as plugins, drivers, agents, etc. fit together. Let’s review that quickly.
+The Neutron-server services requests for core API services such as network, subnet, and port. These are shown in the upper left corner of the diagram.
+In this module, we discussed several type drivers, including local, flat, VLAN, VXLAN and GRE (or Generic Routing Encapsulation). These are shown in the bottom left corner in red.
+We also discussed mechanism drivers such as Linux Bridge, Open vSwitch, and Vendor plugins. Those are shown in purple at the bottom of the diagram.
+        
+We covered Neutron Service plugins for the Router, Load balancer, and firewall. These are outlined in blue.
+On the right side of the diagram, you can see the DHCP, L2, and L3 agents. The DHCP agent uses dnsmasq and the L3 agent uses IP tables for SNAT and DNAT.Be sure to refer to this diagram as needed.
+:::
+
+---
+
+EXERCISES
+
+257
+
+Work through the following labs in the exercise book:
+Lab: External Network Connectivity to VM Lab: Neutron Under the Hood
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 257 diagram](images/slide_257_image_01.png){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 257 diagram](images/slide_257_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+There are two labs associated with our module on Neutron. The first lab is Lab 4b and it addresses external network connectivity to virtual machines. Lab 4c covers Neutron “under the hood” which means that we will be examining the internal workings of Neutron.
+Lab 4b External Network Connectivity to VM One of the common use cases for OpenStack is to run Web applications (such as, a LAMP stack), where each application environment consists of multiple VMs with different roles:
+One or more VMs as Web servers (for example, Apache or nginx).
+One or more VMs running the application.
+One or more VMs as DB servers (MySQL, Maria DB or other DB management system).
+Additional custom VM roles (for example, workers for distributed calculations, etc.).
+In these environments, each of the VMs need to have network communication with each other over a private network. As you might have noticed in previous labs, when a VM starts in OpenStack, it is automatically assigned a private IP address that can be used for this type of communication.
+The Web server VMs also require public network connectivity for client Web browsers.
+OpenStack allows you to optionally add public IP addresses to running instances. This public IP address is called a floating IP. The OpenStack Networking service (Neutron) allows you to create floating IPs and associate them with VM instances. Network traffic is supported using Network Address Translation (NAT), translating floating IPs to virtual instance IPs.
+By the end of Lab 4b, you should be able to:
+Allocate and associate a floating IP to an instance
+Work with Neutron security groups and security group rules
+SSH to an instance using its floating IP
+During 4c, you will see how the OpenStack Networking service utilizes the reference implementations for:
+layer 2 (Open vSwitch)
+layer 3 routing (NAT tables)
+DHCP (DNSmasq)
+Linux network namespaces to support Neutron
+As always, take care to work through the labs step by step. You are encouraged to look back to the presentations in this module and earlier modules for reference. Good luck!
+:::
+
+---
+

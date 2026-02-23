@@ -1,0 +1,2353 @@
+---
+title: "Module 1: Keystone"
+subtitle: "OS220: OpenStack Identity Service"
+format:
+  revealjs:
+    theme: default
+    chalkboard: true
+    preview-links: auto
+    footer: "OS220 - OpenStack Administration"
+    width: 1280
+    height: 720
+    margin: 0.1
+    transition: slide
+    background-transition: fade
+  pptx:
+    reference-doc: ./template.pptx
+    highlight-style: tango
+    slide-level: 2
+---
+
+
+# Authentication, Authorization, and Service Catalog
+
+
+## Keystone Objectives
+
+At the end of this presentation, you should be able to:
+
+- Explain Identity service functions
+- Understand identity management
+- Describe how to authenticate
+- Explain token management
+- Customize policies
+- Understand the service catalog
+- Use REST API for Identity (optional)
+
+::: {.notes}
+
+[pause 1.0s]
+
+
+In this section, we will learn about Keystone, the Identity Service for OpenStack. This is a
+required component used by all OpenStack components.
+
+[pause 0.5s]
+By the end of this module, you will be able to explain each of the functions provided by the
+Identity service.
+
+[pause 0.5s]
+
+This includes identity management and how to authenticate with Keystone, token management,
+policies and how to customize them, and the service catalog.
+
+[pause 0.5s]
+
+Optionally, you may also learn how to use the REST API for Identity requests.
+
+[pause 0.5s]
+
+Keystone version 3 supports multi-tenancy with the concept of domains. A domain is equivalent to
+a company or organization within a company.
+
+[pause 0.5s]
+
+Cloud service providers split each customer into their own domain, providing added security for
+each customer. Some companies split their internal organizations into separate domains.
+
+:::
+
+
+# VM instance deployment: The request process flow
+
+::: {.notes}
+
+[pause 1.0s]
+
+Let us examine the request process flow when deploying a virtual machine instance, with a focus
+on how Keystone participates in this process.
+
+:::
+
+
+## Keystone Deploy Instance Flow
+
+![Keystone Deploy Instance Flow](../assets/images/keystone-deploy-flow.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+This diagram gives an overview of the deploy instance flow. We will revisit this diagram
+throughout the course. For now, let us take a general look at how it works.
+
+[pause 0.5s]
+
+OpenStack components are designed to work together. Suppose you request to deploy a virtual
+machine. This instance could come from the OpenStack CLI client using the openstack server create
+command, or from the Horizon Dashboard user interface. In this case, it is coming from the
+Horizon Dashboard UI.
+
+[pause 0.5s]
+
+The request is sent to Keystone for authentication and authorization. Once Keystone authenticates
+and authorizes the user, it issues a request token. This is then sent back to Horizon. It is
+important to understand that the token will accompany the request throughout the remaining
+process as a security measure to protect against man-in-the-middle attacks.
+
+[pause 0.5s]
+
+The request is sent to Nova, the Compute service. Nova will then interface with other OpenStack
+components to fulfill the request, using hypervisor-specific APIs to deploy the instance. Nova
+uses images stored by Glance, the Image service.
+
+[pause 0.5s]
+
+Nova will now send the request token to Keystone to ensure that this is a valid request. Once
+Keystone validates the token, Nova will then continue communicating with the other OpenStack
+components, Glance for images, Neutron for network, and so on, to fulfill the instance request.
+
+:::
+
+
+## Keystone Overview
+
+Primary Functions of the Identity Service:
+
+- User Authentication
+- Token Management
+- User Authorization
+- Service Catalog
+
+::: {.notes}
+
+[pause 1.0s]
+
+Keystone provides four primary functions.
+
+[pause 0.5s]
+
+First, user authentication, which is standard username and password credential validation.
+
+[pause 0.5s]
+
+Second, token management, wherein users are assigned a token after they are authenticated.
+
+[pause 0.5s]
+
+Third, user authorization, which provides access to functions based on a user role.
+
+[pause 0.5s]
+
+And fourth, the service catalog. The service catalog contains endpoint definitions for each
+OpenStack service, that is to say Keystone, Nova, Glance, and so on. The endpoint defines URLs
+to access each specific component.
+
+[pause 0.5s]
+
+Keystone is used throughout any request process flow to validate the auth-token at each step and
+to provide the service catalog. For example, when nova-api needs to send a request to the
+glance-api, it uses the entry for Glance in the service catalog as the target of the request.
+
+:::
+
+
+## Keystone Key Point
+
+Keystone is used throughout any request process flow to validate the auth-token at each step and
+to provide the service catalog.
+
+::: {.notes}
+
+[pause 1.0s]
+
+This is an important concept to remember. Keystone validates the authentication token at every
+step in any request process flow.
+
+[pause 0.5s]
+
+This provides security and ensures that only authorized requests can proceed through the system.
+
+:::
+
+
+## Keystone Architecture
+
+![Keystone Architecture](../assets/images//keystone-architecture.png){width="92%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+This diagram shows the Keystone architecture. Each service knows where and how to communicate
+with the Keystone API based on configuration file definitions.
+
+[pause 0.5s]
+
+The Keystone API service connects to several backends. The Token Backend, which can use Fernet
+or JWS, manages tokens. The Identity Backend, which can use database, LDAP, or other sources,
+provides authentication. The Service Catalog, stored in the database, manages services and
+endpoints. And the Policy Backend, using JSON or YAML files, defines RBAC rules with one file
+per component.
+
+:::
+
+
+## CLI RC File and Environment Variables
+
+Environment variables typically defined in an RC file:
+
+- OS_AUTH_URL: Keystone URL
+- OS_USER_DOMAIN_NAME: User domain
+- OS_PROJECT_NAME: Project for user
+- OS_USER_NAME: Name of user
+- OS_USER_PASSWORD: User password
+
+::: {.notes}
+
+[pause 1.0s]
+
+This slide discusses the environment variables you would need to define in an RC file.
+
+[pause 0.5s]
+
+At a minimum, you need to define the environment variables for things like authentication, domain
+name, project name, region, or API version, as well as username and password.
+
+[pause 0.5s]
+
+There are a few more environment variables available. For a list, consult the OpenStack API
+documentation.
+
+[pause 0.5s]
+
+You can build your own RC file or download one using the Dashboard UI. The next several slides
+show how to download an RC file from the Dashboard UI.
+
+:::
+
+
+## RC File from Dashboard - Step 1
+
+![RC File Download Step 1](images/slide_042_image_01.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here is the process for building an RC file from the Horizon Dashboard UI.
+
+[pause 0.5s]
+
+The OpenStack RC file contains the environment variables that are necessary to run OpenStack
+command-line clients. The file contains tenant-specific environment variables. The API URLs for
+projects such as Cinder, Keystone, Murano, and Neutron for the tenant can be found on the Access
+and Security, API Access tab.
+
+[pause 0.5s]
+
+You must be a self-service user or an administrator to perform this operation. To view the
+contents of the OpenStack RC file, log in to the dashboard. Click Access and Security in the left
+panel, and then click the API Access tab.
+
+[pause 0.5s]
+
+Once there, click OpenStack RC File to download a complete RC file. This downloads an RC file to
+your local machine that you must FTP to the lab environment. One minor note, the UI-generated RC
+file requires you to enter the user password when you source the RC file.
+
+:::
+
+
+## RC File from Dashboard - Step 2
+
+![RC File Download Step 2](images/slide_043_image_01.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+The example shown on the slide has the password defined in the RC file using OS_PASSWORD. This is
+not the best approach, but it works well for a lab environment.
+
+[pause 0.5s]
+
+As an alternative, you can build the RC file manually. As you do so, think about what you need
+when you log in to the Dashboard.
+
+[pause 0.5s]
+
+Among those will be the Domain, which here is the default, the User name which is shown here as
+demo, the Password which is nova, the project which on this image is also demo, the URL for
+Keystone which you can see highlighted on the image, and the Version of the Keystone API which
+in this case is version 3.
+
+:::
+
+
+# Additional Authentication Methods Beyond Simple Username and Password
+
+::: {.notes}
+
+[pause 1.0s]
+
+Keystone supports various methods of authentication beyond the standard username and password
+method.
+
+[pause 0.5s]
+
+This lesson introduces those additional methods.
+
+:::
+
+
+## Multi-Factor Authentication
+
+- MFA configured per user
+- Requires resource options to be set
+- TOTP is suggested second factor
+- Can use password authentication
+- More options planned for future
+
+::: {.notes}
+
+[pause 1.0s]
+
+Multi-factor authentication, or MFA, is configured on a per-user basis. MFA requires the
+resource options multi_factor_auth_rules and multi_factor_auth_enabled to be set.
+
+[pause 0.5s]
+
+A supported option is TOTP, or Time-based One-time Password, which is the only suggested second
+factor authentication. Also, the use of password authentication is permitted. There are plans to
+include more MFA options in the future.
+
+[pause 0.5s]
+
+Most of us are already familiar with two-factor authentication, or 2FA. Two-factor authentication
+is a subset of multi-factor authentication.
+
+[pause 0.5s]
+
+Documentation for both authentication mechanisms and multi-factor authentication can be found on
+the docs.openstack.org website.
+
+:::
+
+
+## Time-Based Password Authentication
+
+TOTP Authentication:
+
+- Unique password generated
+- Valid for short time period
+- Use app like Google Authenticator
+- Generate 6-digit passcode
+- Use passcode to request token
+
+::: {.notes}
+
+[pause 1.0s]
+
+Time-based One-time Password, or TOTP, authentication is supported by Keystone. With TOTP, a
+unique password or passcode is generated that is valid for a short period of time.
+
+[pause 0.5s]
+
+With TOTP, users will use an app, such as Google Authenticator, to generate a six-digit passcode.
+The user will then use this passcode to request a token from Keystone.
+
+[pause 0.5s]
+
+Documentation for Time-based One-time Password authentication can be found on the docs.openstack
+dot org website.
+
+:::
+
+
+## TOTP Example: Get Token
+
+![ ](images/01-slide-15-TOTP_GetTokenExample.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+This image shows an example of a REST API call using a TOTP passcode to obtain a Keystone token.
+In this example, a curl command is used to generate the token. The REST API usage is discussed
+later in this module.
+
+[pause 0.5s]
+
+Use an app, such as Google Authenticator, to generate a six-digit passcode for the PASSCODE
+variable. The USER_ID must be a valid Keystone user.
+
+:::
+
+
+## Federated Identity: Single Sign-On
+
+- Share identity across systems
+- Authenticate with external source
+- Provides primary identity source
+- No separate credentials needed
+- LDAP backend is one method
+
+::: {.notes}
+
+[pause 1.0s]
+
+Federated identity, also known as Single Sign-on or SSO, is the ability to share identity
+information across multiple identity management systems.
+
+[pause 0.5s]
+
+Using a federated identity allows users to authenticate directly with another identity source.
+This provides Keystone with a set of user attributes. Federated identity provides a primary
+identity source so that users do not need a separate set of credentials.
+
+[pause 0.5s]
+
+LDAP backend is one method of establishing a federated identity, but it requires Keystone to
+handle passwords directly instead of offloading authentication to an external source.
+
+[pause 0.5s]
+
+Documentation on federated identity can be found on the docs.openstack.org website.
+
+:::
+
+
+## External Authentication
+
+- Web servers support many methods
+- Keystone benefits from web server auth
+- REMOTE_USER variable is set
+- Token assigned when user exists
+
+::: {.notes}
+
+[pause 1.0s]
+
+Another authentication method is using external authentication. Web servers, such as Apache HTTP,
+support many methods of authentication. Keystone can benefit from these different methods by
+allowing the web server to perform the authentication.
+
+[pause 0.5s]
+
+Once authenticated, the web server sets the REMOTE_USER environment variable. If the REMOTE_USER
+user exists in Keystone, they are assigned a token.
+
+[pause 0.5s]
+
+Documentation for authentication mechanisms in general and external authentication specifically
+can be found on the docs.openstack.org website. The Apache web server provides support for
+additional authentication methods that are not provided by the identity store backend or any
+other authentication plugins that Keystone supports. To use these methods, Keystone should be
+running on Apache.
+
+:::
+
+
+## Tokenless Authentication
+
+- Uses X.509 SSL client certificate
+- No token issuance required
+- Time-bound digital identity
+- Certified by cryptographic means
+- Requires OpenSSL CLI tool
+
+::: {.notes}
+
+[pause 1.0s]
+
+Token-less authentication authenticates the user by using an X.509 SSL client certificate without
+having to issue a token.
+
+[pause 0.5s]
+
+This token is a time-bound digital identity. It is certified or digitally signed by its issuer
+using cryptographic means as defined by the X.509 standard.
+
+[pause 0.5s]
+
+Keystone uses the X.509 certificate instead of a password for authentication. Configuring for
+token-less authentication can only be done using the OpenSSL CLI tool.
+
+[pause 0.5s]
+
+This feature utilizes the Keystone federation capability to determine the authorization
+associated with the incoming X.509 SSL client certificate by mapping the certificate attributes
+to a Keystone identity.
+
+:::
+
+
+# Keystone Resource Options
+
+::: {.notes}
+
+[pause 1.0s]
+
+In this section, you will learn about Keystone's resource options. These are considered an
+advanced feature of Keystone.
+
+[pause 0.5s]
+
+Documentation on Keystone resource options can be found on the docs.openstack.org website.
+
+:::
+
+
+## Resource Options Overview
+
+Definition and usage:
+
+- Attribute optionally set on entity
+- Provides per-resource flexibility
+- Alternative to global config settings
+- Use REST API to set options
+- POST when resource created
+- PATCH to update later
+
+::: {.notes}
+
+[pause 1.0s]
+
+A resource option is an attribute that can be optionally set on an entity in Keystone. Resource
+options provide flexibility on a per-resource basis as opposed to global settings in a
+configuration file.
+
+[pause 0.5s]
+
+For example, for a user, you could use the REST API to set options when a resource is created
+with a POST, or updated later as a PATCH.
+
+[pause 0.5s]
+
+Documentation on Keystone resource options can be found on the docs.openstack.org website.
+
+:::
+
+
+## Supported Resource Options
+
+User Authentication Options:
+
+- multi_factor_auth_enabled
+- multi_factor_auth_rules
+
+User Security Compliance Options:
+
+- ignore_user_inactivity
+- ignore_change_password_upon_first_use
+- ignore_password_expiry
+- ignore_lockout_failure_attempts
+- lock_password
+
+::: {.notes}
+
+[pause 1.0s]
+
+This image shows some of the supported resource options. Some apply to user authentication, while
+others apply to user security compliance.
+
+[pause 0.5s]
+
+The user options include authentication settings and security compliance settings.
+
+:::
+
+
+## Resource Options: Role, Project, Domain
+
+Immutable Option:
+
+- When set, resource cannot be deleted
+- Applies to role, project, and domain
+- Prevents accidental deletion
+
+::: {.notes}
+
+[pause 1.0s]
+
+The immutable options, such as domain, project, or role, can be set to prevent a user from
+accidentally deleting a domain, project, or role.
+
+[pause 0.5s]
+
+The role, project, and domain options are primarily about whether a user can delete the role,
+project, or domain. These settings cannot be changed once established.
+
+[pause 0.5s]
+
+Documentation on Keystone resource options can be found on the docs.openstack.org website.
+
+:::
+
+
+## Resource Options Example: Enable MFA
+
+```json
+{
+  "user": {
+    "default_project_id": "fb5e60e04a6e43c5813b785f9a29ee1e",
+    "domain_id": "default",
+    "enabled": true,
+    "name": "student",
+    "options": {
+      "multi_factor_auth_enabled": true,
+      "multi_factor_auth_rules": ["password,totp"],
+      "ignore_password_expiry": true
+    }
+  }
+}
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here is a sample script for how you can enable and define multi-factor authentication.
+
+[pause 0.5s]
+
+Further documentation on Keystone resource options can be found on the docs.openstack.org
+website.
+
+:::
+
+
+# Encrypting User Credentials
+
+::: {.notes}
+
+[pause 1.0s]
+
+This lesson discusses an option to encrypt each set of user credentials, which comprise username
+and password.
+
+:::
+
+
+## Token Encryption
+
+Default encryption settings:
+
+- Keystone encrypts all credentials
+- Uses database as identity backend
+- Fernet used for encryption
+- Transparent to user
+- Secured storage of credentials
+
+```ini
+[credential]
+provider = fernet
+key_repository = /etc/keystone/credential-keys
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+By default, Keystone encrypts all user credentials when using a database as the identity service
+backend.
+
+[pause 0.5s]
+
+The sample shown here uses Fernet for encryption, is transparent to the user unless accessing the
+database directly, and provides secured storage of credentials.
+
+[pause 0.5s]
+
+Documentation on credential encryption can be found on the docs.openstack.org website.
+
+:::
+
+
+# Keystone Token Management - Identity Service
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+In this next section we will cover Keystone token management.
+
+[pause 0.5s]
+
+Once a user is authenticated, a unique token is generated for the request and used internally
+between OpenStack components to validate the request. Requests can come from the CLI client,
+Dashboard UI, or REST API. This lesson introduces Keystone tokens. All Keystone tokens are bearer
+tokens and must be protected from unnecessary disclosure to prevent unauthorized access.
+
+[pause 0.5s]
+
+For more details, refer to the docs.openstack.org documentation on tokens.
+
+:::
+
+
+## Token Overview
+
+- Each request assigned a token
+- Tokens created and used internally
+- Most common scope is project-scoped
+- User authenticated within project
+- Contains service catalog and roles
+- Default validity is 1 hour
+
+```ini
+[token]
+expiration = 3600
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+The scope of a token can be un-scoped, project-scoped, domain-scoped, or system-scoped. By
+default, a token is valid for an hour. Most requests will complete in less time.
+
+[pause 0.5s]
+
+Some longer running requests might need more time. For example, you may be uploading large images
+to the Glance image repository, or you may need to deploy Heat stacks with multiple instances.
+In those cases, a token re-validation process is handled internally.
+
+[pause 0.5s]
+
+Once authenticated, each request is assigned a token. Tokens are created and used internally.
+When a user submits a request, such as create server, the user has no need to understand tokens.
+
+[pause 0.5s]
+
+The most common configuration is project-scoped. In this case, the user is authenticated within
+a specific project. Keystone authenticates the requester when working with most other services.
+The OpenStack control node contains a service catalog, a set of roles, and details of the project
+upon which the user has authorization.
+
+:::
+
+
+## Token Types
+
+Historical context:
+
+- Previous releases stored in database
+- PKI and PKZ tokens were larger
+- Caused database bloat
+
+Current supported token providers:
+
+- Fernet (default)
+- JSON Web Signature (JWS)
+
+::: {.notes}
+
+[pause 1.0s]
+
+In the past, tokens were stored in the database. In a typical cloud, many requests are generated
+daily. Each request requires a token. Since the tokens were larger, that increased the hit on the
+database as each token was stored. As a result, the size of the database grew. In some cases, it
+affected database performance. This was called database bloat.
+
+[pause 0.5s]
+
+Storing tokens in the database is still a common practice in many OpenStack installations. When
+the OpenStack footprint is still small, this can be an acceptable practice. In fact, often
+everything is put in the database, especially in development environments. However, this practice
+does not scale as your infrastructure grows.
+
+[pause 0.5s]
+
+In summary, Fernet tokens help administrators address the issue of database bloat. Supported
+token providers are Fernet, which is the default, and the JSON Web Signature, also known as JWS.
+JWS was implemented in the Stein release.
+
+:::
+
+
+## Fernet Tokens
+
+Characteristics:
+
+- Small, under 255 characters
+- Encrypted with AES256
+- Verified with SHA256 HMAC signature
+- Signed using symmetric key
+- Not stored in Keystone DB
+
+Contents:
+
+- User ID
+- Project ID
+- Expiration info
+- Auditing info
+
+::: {.notes}
+
+[pause 1.0s]
+
+This slide introduces Fernet tokens. Some things to keep in mind are that Fernet tokens are
+small, that is less than 255 characters, and they are encrypted for security and integrity.
+
+[pause 0.5s]
+
+A Fernet token contains the user ID, the project ID, expiration information, and other auditing
+information. Fernet tokens are signed using a symmetric key. They are no longer stored or
+persisted in the Keystone database, thus making them easier to manage and improving performance.
+
+[pause 0.5s]
+
+Keystone only supports file-backed key repositories. You need to set the key_repository to
+/etc/keystone/fernet-keys in the OpenStack control node containing Keystone in order to use
+Fernet tokens.
+
+:::
+
+
+## Fernet Token Security
+
+- Only Keystone accesses encrypt keys
+- Only Keystone accesses decrypt keys
+- Use for payload exposure concerns
+- AES256 encryption standard
+- SHA256 HMAC verification
+
+::: {.notes}
+
+[pause 1.0s]
+
+This slide is intended primarily as a reference. Fernet tokens are encrypted using AES256, or the
+Advanced Encryption Standard, and verified with a SHA256 HMAC signature.
+
+[pause 0.5s]
+
+HMAC, or hash-based message authentication code, is a specific type of message authentication
+code involving a cryptographic hash function and a secret cryptographic key.
+
+[pause 0.5s]
+
+As a general rule, you should use Fernet tokens if you are concerned about public exposure of the
+payload used to build tokens.
+
+:::
+
+
+## JWS Tokens
+
+JSON Web Signature characteristics:
+
+- Type of JSON Web Token (JWT)
+- Signed asymmetrically with key-pairs
+- Private keys sign, public keys validate
+- Each Keystone server has own key-pair
+- Non-persistent, no DB bloating
+- Payload can be read by anyone
+
+::: {.notes}
+
+[pause 1.0s]
+
+JWS, or JSON Web Signature, token format is a type of JSON Web Token, also known as JWT. JWS
+tokens are signed asymmetrically. They are not encrypted, and they use key pairs.
+
+[pause 0.5s]
+
+They are signed with private keys, called private.pem, and validated with public keys. Each
+Keystone server generates its own key pair. They are non-persistent, thus avoiding database
+bloating. However, they involve additional setup across each host.
+
+[pause 0.5s]
+
+You should use JWS tokens if there are security concerns about sharing symmetric encryption keys
+across hosts, as with Fernet tokens. However, bear in mind that the JWS token payload can be
+read by anyone. The primary reason to use JWS over Fernet would be due to security concerns over
+sharing the symmetric encryption keys.
+
+:::
+
+
+## CLI Token Usage {layout="Title and Content"}
+
+
+![ ](images/2026-01-20_17-01-39.png)
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+This slide shows how to request and revoke a token using the command line interface.
+
+[pause 0.5s]
+
+The openstack token issue command generates a new token and displays its details, including the
+expiration time, token ID, project ID, and user ID.
+
+[pause 0.5s]
+
+The openstack token revoke command invalidates a specific token. Note that there are no spaces
+or line-continuation marks in the token. The hyphen character is part of the token.
+
+:::
+
+
+## Token Usage: High Level
+
+![Token Usage Flow](images/01-slide_065-TokenHighLevelUsage.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+This diagram shows authentication and token usage at a high level. When the user submits a
+request, for example a deploy instance, their credentials are authenticated with Keystone and
+the request is assigned an auth-token to be used for the life of the request.
+
+[pause 0.5s]
+
+Instead of the user credentials, the token is passed between components, such as from
+nova-compute to glance-api, throughout the lifecycle of the request.
+
+[pause 0.5s]
+
+Each component re-validates the token with Keystone. This ensures the request is valid. As an
+example of its value, this practice could reduce the possibility that a hacker can submit a
+request because they will not have a valid token.
+
+:::
+
+
+## Keystone Token Validation (Reference)
+
+Token validation process:
+
+1. Clear existing auth headers
+2. Collect token from HTTP headers
+3. Validate token
+4. If valid: Populate additional headers
+5. If invalid: Reject request (401)
+6. If unavailable: Reject request (503)
+
+::: {.notes}
+
+[pause 1.0s]
+
+This flowchart is provided as a reference for the Keystone token validation process. After a user
+has cleared existing auth headers and a token has been collected from the HTTP headers, the
+validate token request will either be valid or invalid, or the Keystone service will be reported
+unavailable.
+
+[pause 0.5s]
+
+Some examples of the response codes are: 401 means not authorized, that is, the credentials or
+token are not valid. 403 means forbidden, that is, the authentication was successful, but the
+user does not have authority to perform the action. This is most likely caused by a policy rule.
+404 means not found, that is, the authentication was successful, but the request is bad. This is
+most likely the result of a bad POST request format. And 503 means service not available, that
+is, the endpoint was not found. This could be due to an incorrect definition or that an
+environment variable was not set.
+
+:::
+
+
+## Security Compliance Options
+
+Configuration in keystone.conf:
+
+```ini
+[security_compliance]
+unique_last_password_count = 2
+lockout_duration = 10
+lockout_failure_attempts = 2
+disable_user_account_days_inactive = 90
+change_password_upon_first_use = True
+password_expires_days = 90
+minimum_password_age = 1
+password_regex = ^(?=.*\d)(?=.*[a-zA-Z]).{7,}$
+```
+
+Most options disabled by default.
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here are some user login and password configuration options you will see in the Keystone
+configuration file keystone.conf.
+
+[pause 0.5s]
+
+In the security compliance section, you can set the number of unique passwords, the duration of a
+lockout and the number of failure attempts that trigger a lockout, the number of inactive days
+that will trigger disabling the account, whether the password must be changed on first use, the
+duration of a password and minimum age, and the regex or regular expressions for password
+validation.
+
+[pause 0.5s]
+
+Most of these options are disabled by default.
+
+:::
+
+
+## Security Compliance: Account Options
+
+Account management settings:
+
+- disable_user_account_days_inactive
+  - Max days without authenticating
+  - Default: disabled
+
+- lockout_failure_attempts
+  - Max failed auth attempts
+  - Default: disabled
+
+- lockout_duration
+  - Seconds account will be locked
+  - Default: 1800 seconds
+  - Requires SQL backend
+
+::: {.notes}
+
+[pause 1.0s]
+
+The disable_user_account_days_inactive setting specifies the maximum number of days a user can
+go without authenticating before being considered inactive.
+
+[pause 0.5s]
+
+The lockout_failure_attempts setting specifies the maximum number of times that a user can fail
+to authenticate before the account is locked.
+
+[pause 0.5s]
+
+The lockout_duration setting specifies the number of seconds the account will be locked. This
+requires a SQL backend and defaults to 1800 seconds.
+
+:::
+
+
+## Security Compliance: Password Options
+
+Password management settings:
+
+- change_password_upon_first_use
+  - Requires password change on login
+  - Can enable for some or all users
+  - Default: disabled
+
+- password_expires_days
+  - Days password is valid
+  - Default: disabled
+
+- unique_password_count
+  - Previous passwords kept in history
+  - Enforces unique new passwords
+  - Default: disabled
+
+::: {.notes}
+
+[pause 1.0s]
+
+The change_password_upon_first_use setting requires users to change their password upon initial
+login. This can be enabled for some or all users. Before enabling this directive, you may want
+to exempt some users that you do not wish to be required to change their password.
+
+[pause 0.5s]
+
+For example, you may want to exempt users in the service project such as Nova, Glance, and so on.
+You may also want to exempt admin users. You can mark a user as exempt by setting the user
+options attribute ignore_change_password_upon_first_use.
+
+[pause 0.5s]
+
+The password_expires_days setting specifies the number of days a password is considered valid.
+The unique_password_count setting specifies the number of previous user password iterations to
+keep in history, enforcing that newly created passwords are unique.
+
+:::
+
+
+## Security Compliance: Advanced Options
+
+Advanced password settings:
+
+- minimum_password_age
+  - Days password must be used
+  - Prevents immediate changes
+  - Requires SQL backend
+
+- password_regex
+  - Regular expression for validation
+  - Requires SQL backend
+
+- password_regex_description
+  - Describes requirements to user
+  - Displayed if password fails
+
+::: {.notes}
+
+[pause 1.0s]
+
+The minimum_password_age setting specifies the number of days that a password must be used before
+it can be changed. This prevents users from immediately changing their password in order to wipe
+out password history and reuse old passwords.
+
+[pause 0.5s]
+
+The password_regex setting is a regular expression used to validate password strength
+requirements. This requires a SQL backend.
+
+[pause 0.5s]
+
+The password_regex_description setting describes the password expression in language the user can
+understand. This description is displayed to the user if the password does not match the
+expression.
+
+:::
+
+
+## Password Regex Example
+
+<!-- This is the yellow/black "Caution" sign 
+![Password Regex Example](images/slide_072_image_01.png){width="50%"}
+-->
+Example configuration:
+
+```ini
+password_regex_description = Passwords must contain at
+    least 1 digit, 1 letter, and minimum length of 7
+password_regex = ^(?=.*\d)(?=.*[a-zA-Z]).{7,}$
+```
+Important: Ensure description accurately matches regex requirements.
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here is an example of password regex configuration. You must ensure the password description
+accurately and completely describes what the password requirements are.
+
+[pause 0.5s]
+
+If the description and regex are out of sync, the user experience will be frustrating. Users will
+not understand why their password is being rejected if the error message does not match the
+actual requirements.
+
+:::
+
+
+# Keystone Policy: The Identity Service
+
+::: {.notes}
+
+[pause 1.0s]
+
+Based on their role, users have access to the various OpenStack operations against resources.
+These operations include create instance, create user, and so on.
+
+[pause 0.5s]
+
+Each OpenStack component has a set of policies that define the RBAC rules. The policies are
+defined in policy.yaml or policy.json files for each component.
+
+:::
+
+
+## Default Role-Based Access Control
+
+![Default RBAC](images/slide_074_image_01.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+UI or CLI. This sends requests to the Keystone API.
+
+[pause 0.5s]
+
+The process of creating a user includes assigning a role to the user when the user is added as a
+member of a project. Users might have multiple roles in a project. They might also be members of
+more than one project, including having different roles in each project.
+
+[pause 0.5s]
+
+The most common roles are admin and member. You can create other roles, as needed. For example,
+team_leader or dept_manager.
+
+[pause 0.5s]
+
+Keystone provides role-based access to operations on OpenStack resources. For example, by
+default, any user with the admin role can perform most, if not all, operations on OpenStack
+resources. Any user with the member role is restricted from listing users or performing updates
+for other users. They are, however, allowed to perform normal operations in the Cloud, such as
+creating Cinder volumes.
+
+:::
+
+
+## Modified Role-Based Access Control
+
+![Modified RBAC](images/slide_075_image_01.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here is an example of a modified Role-Based Access Control.
+
+[pause 0.5s]
+
+Suppose John's company only wants admin operational access to create Cinder volumes. Each
+OpenStack component supports configuring its own policy files located in the /etc/project
+directory. The administrator can edit the policies in the policy.json or policy.yaml files based
+on the requirements of the organization.
+
+[pause 0.5s]
+
+Since John has the member role, his request will not be allowed and will return an HTTP 403 error
+message indicating that he is not authorized to perform the requested action.
+
+[pause 0.5s]
+
+Note that in some cases, a policy file might not exist for the OpenStack component. This will be
+discussed in the upcoming section on editing policy files.
+
+:::
+
+
+## Keystone Policy Files
+
+Policy file locations:
+
+- /etc/component_name/policy.json
+- /etc/component_name/policy.yaml
+
+::: {.notes}
+
+[pause 1.0s]
+
+Each OpenStack service, Identity, Compute, Networking, and so on, has its own role-based access
+or RBAC policies. The policies determine which user can access which objects in which way, based
+on their role.
+
+[pause 0.5s]
+
+The policy.json and policy.yaml files can be found in the /etc/component_name directory.
+Beginning with the Pike release, the default policies are implemented in the code. You can
+override the defaults by modifying the policy.yaml files. An oslo utility is provided to create
+the policy.yaml file.
+
+[pause 0.5s]
+
+In some cases, you still edit the older policy.json files. The primary purpose of this lesson is
+to help you understand when you need to edit policy.yaml or policy.json.
+
+:::
+
+
+## Policy-Role Overview
+
+Minimum roles in OpenStack:
+
+- reader: Can only display resources
+
+- member: Common tasks like deploy instances, create images and volumes
+
+- admin: Managing cloud tasks like creating users, projects, roles, flavors, and sharing
+  resources
+
+::: {.notes}
+
+[pause 1.0s]
+
+At minimum, each OpenStack installation has three roles for users.
+
+[pause 0.5s]
+
+A reader can only display resources. A member can perform most common tasks, such as deploying
+and managing instances, creating images and volumes, and more. An admin is able to perform
+additional tasks for managing the cloud, such as creating users, projects, roles, creating
+flavors, and sharing resources such as networks and images.
+
+[pause 0.5s]
+
+You can create additional roles, however you must synchronize and update policy files with the
+new roles.
+
+:::
+
+
+## Policy-Role Assignment
+
+Role assignment details:
+
+- Users assigned role in project
+- Can have different roles per project
+- Can have multiple roles in project
+- Other roles exist for Heat, LBaaS
+- Use caution when updating policy files
+- Always backup files before editing
+
+::: {.notes}
+
+[pause 1.0s]
+
+Users are assigned their role when they are added to a project. For example, you could use the
+command openstack role add with the user and project flags to assign a new role.
+
+[pause 0.5s]
+
+Users can have multiple roles in a project and they can have different roles in different
+projects. Other roles exist for Heat, load balancing, and so on.
+
+[pause 0.5s]
+
+Be forewarned that care should be used when updating the policy files. If not done properly, you
+might cause problems with the system. Always backup any files before editing.
+
+:::
+
+
+## Defining and Updating Policy
+
+Policy configuration guidance:
+
+- Default policies defined in code since Pike
+- Check /etc/component_name for files
+- If policy.json exists, use it
+- If no file exists, create policy.yaml
+- May need for Keystone, Nova, Cinder, Glance
+
+::: {.notes}
+
+[pause 1.0s]
+
+Default policies are defined in the code beginning with the Pike release. However, not all
+components have been updated.
+
+[pause 0.5s]
+
+If you need to make changes, look under the /etc/ directory using the name of that component for
+either the policy.json or policy.yaml file.
+
+[pause 0.5s]
+
+If a policy.json file exists, use it. For components that have not been updated and do not
+support the newer technology, for example Neutron, you will need to edit or update the
+policy.json file.
+
+[pause 0.5s]
+
+If no policy file exists, create policy.yaml. For components that support the newer technology,
+for example Keystone, Nova, Cinder, Aodh, Ceilometer, Heat, and Octavia, simply define policy
+overrides in their policy.yaml files. One exception is Glance, which does not ship a policy file.
+You need to create and use policy.json.
+
+:::
+
+
+## Policy Examples: YAML
+
+Allow all users to list instances:
+
+```yaml
+# /etc/nova/policy.yaml
+"os_compute_api:servers:index": ""  # empty rule = always allow
+```
+
+Only admin can create users:
+
+```yaml
+# /etc/keystone/policy.yaml
+"identity:create_user": "role:admin"
+# OR
+"identity:create_user": "role:admin and system_scope:all"
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here you can see two examples of updating policy.yaml. Please note that care should be used when
+updating the policy files. If not done properly, you might cause problems with the system. Always
+backup any files before editing.
+
+[pause 0.5s]
+
+To allow all users, regardless of role, to list instances, you need to edit the /etc/nova/
+policy.yaml file as shown. An empty rule means always allow.
+
+[pause 0.5s]
+
+To restrict the ability to create other users only to users with admin role, you would edit the
+/etc/keystone/policy.yaml file as shown.
+
+:::
+
+
+## Policy Examples: More YAML
+
+Allow only owner to start instance:
+
+```yaml
+# /etc/nova/policy.yaml
+"os_compute_api:servers:start": "project_id:%(project_id)s"
+```
+
+No user can delete a flavor:
+
+```yaml
+# /etc/nova/policy.yaml
+"os_compute_api:os-flavor-manage:delete": "!"
+# "!" means never or nobody
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here are some additional examples. Again, take care to backup the files before editing.
+
+[pause 0.5s]
+
+To allow only instance owners to start an instance, edit the /etc/nova/policy.yaml as shown. The
+project_id resolves to the project that owns the resource.
+
+[pause 0.5s]
+
+To restrict all users, regardless of role, from deleting a flavor, edit the /etc/nova/policy.yaml
+as shown. The exclamation mark means never or nobody.
+
+:::
+
+
+## Updating Policy: JSON
+
+Only admin can create routers (Neutron):
+
+Edit existing policy.json file:
+
+```json
+// Original line
+"create_router": "rule:regular_user"
+
+// Modified line
+"create_router": "rule:admin_only"
+```
+
+Changes take effect immediately.
+
+::: {.notes}
+
+[pause 1.0s]
+
+Policy is an area being updated by the OpenStack community. As a result, this is a transition
+period. For example, Neutron policy configuration uses the older policy.json file.
+
+[pause 0.5s]
+
+Suppose you need to change the Neutron policy such that only users with the admin role are
+allowed to create routers. To do so, you need to edit the existing policy.json file. First locate
+the create_router rule and then modify it as shown, changing the create_router rule from
+regular_user to admin_only.
+
+[pause 0.5s]
+
+After all changes have been made, save the file. Changes take effect immediately. As always,
+backup any files before editing.
+
+:::
+
+
+## Updating Policy: YAML Creation
+
+Only admin can create volumes (Cinder):
+
+```bash
+# Generate policy file if none exists
+oslopolicy-sample-generator --namespace cinder \
+    --format yaml --output-file cinder-policy.yaml
+```
+
+Edit the newly created yaml file:
+
+```yaml
+# Original line (commented out)
+#"volume:create": ""
+
+# Modified line
+"volume:create": "role:admin"
+```
+
+Changes take effect immediately.
+
+::: {.notes}
+
+[pause 1.0s]
+
+Suppose you need to change the Cinder policy such that only users with the admin role are allowed
+to create volumes. This example shows how to apply the admin role to the create volume operation.
+
+[pause 0.5s]
+
+In this case, to edit the yaml file, first locate the create volume policy and uncomment all
+needed policy rules to modify it. If there is no policy file, use the oslopolicy-sample-generator
+tool to build one following the instructions shown here. All policies and rules will be commented
+out, so you simply uncomment the ones you need in order to modify them.
+
+[pause 0.5s]
+
+The change is immediate. There is no need to restart the OpenStack services. As always, backup
+any files before editing.
+
+:::
+
+
+## Example Response: Non-Admin Users
+
+:::::: {.columns}
+::: {.column width="50%"}
+![UI Error](images/slide_084_image_01.jpg){width="90%"}
+:::
+::: {.column width="50%"}
+![Permission Error](images/slide_084_image_02.jpg){width="90%"}
+:::
+::::::
+
+## CLI error:
+
+```bash
+$ openstack volume create --size 1 nonAdminVOL
+Policy doesn't allow volume:create to be performed (HTTP 403)
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+Non-admin users attempting to make these changes will see errors.
+
+[pause 0.5s]
+
+From the UI, non-admin users will see an Unable to create volume error. In some cases, UI users
+might also see an error due to insufficient permissions.
+
+[pause 0.5s]
+
+Non-admin users in the command line will see the 403 forbidden error message as shown here.
+
+:::
+
+
+# Keystone Implied Roles
+
+::: {.notes}
+
+[pause 1.0s]
+
+This next section addresses implied roles within Keystone.
+
+:::
+
+
+## Implied Roles Overview
+
+<!-- ![Implied Roles Hierarchy](images/slide_086_image_01.jpg){width="60%"} -->
+![Implied roles allow role hierarchy with inherited roles.  Policy files must be updated for each role.](images/slide_086_image_01.jpg){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+Up to this point, the discussion has focused on a simple usage of roles. This section introduces
+implied roles, also known as role hierarchies or role inference rules.
+
+[pause 0.5s]
+
+As shown in the diagram, implied roles allow you to define a role hierarchy with inherited roles.
+Remember that the policy files must also be updated for each role. Implied roles can reduce the
+complexity of your policy files.
+
+[pause 0.5s]
+
+For more information on implied roles, see the documentation on cli-manage-projects-users-and
+-roles.
+
+:::
+
+
+## Implied Roles: CLI Example
+
+Create the roles and user:
+
+```bash
+openstack role create admin
+openstack role create member
+openstack user create --password nova alice
+```
+
+Create implied role:
+
+```bash
+openstack implied role add --implied-role member admin
+```
+
+Assign only the admin role:
+
+```bash
+openstack role add --user alice --project demo-project admin
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+In this example, we are going to walk you through setting up implied roles. In this scenario we
+will use a project, in this case the demo project which is already created, a user named Alice,
+and the roles of admin and member.
+
+[pause 0.5s]
+
+We define that admin implies member, and we assign only the admin role to Alice.
+
+:::
+
+
+## Implied Roles: Verification
+
+Verify user role assignment:
+
+```bash
+openstack role assignment list --user alice --project demo-project --name
++--------+-------+--------------+
+| Role   | User  | Project      |
++--------+-------+--------------+
+| admin  | alice | demo-project |
++--------+-------+--------------+
+```
+
+This does not show all roles assigned, but the token will.
+
+::: {.notes}
+
+[pause 1.0s]
+
+The role assignment list command shows that Alice has the admin role in the demo-project.
+
+[pause 0.5s]
+
+However, this does not really show all the roles assigned through the implied role mechanism.
+The token will reveal the complete picture.
+
+:::
+
+
+## Implied Roles: Token Verification
+
+```bash
+$ source alicerc.sh
+$ openstack token issue -f json | jq '.roles'
+[
+  {
+    "id": "xxxxxxxx",
+    "name": "admin"
+  },
+  {
+    "id": "yyyyyyyy",
+    "name": "member"
+  }
+]
+```
+
+::: {.notes}
+
+[pause 1.0s]
+
+After sourcing Alice's RC file and issuing a token, we can see that the token contains both the
+admin role and the member role.
+
+[pause 0.5s]
+
+This confirms that the implied role mechanism is working correctly. Alice was only assigned the
+admin role explicitly, but through the implied role, she also has the member role.
+
+:::
+
+
+# Keystone Service Catalog
+
+::: {.notes}
+
+[pause 1.0s]
+
+This next section addresses the Keystone Service Catalog.
+
+:::
+
+
+## Service Catalog Overview
+
+![Service Catalog](images/slide_091_image_01.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+OpenStack services can query the Keystone service catalog to determine how to communicate with
+other OpenStack services.
+
+[pause 0.5s]
+
+When you deploy a virtual machine instance, for example, Nova needs to communicate with Glance to
+verify the selected image is valid. Nova will query the service catalog to retrieve the URL to
+access Glance and then send a request to Glance using that URL to validate the image.
+
+[pause 0.5s]
+
+You can view the service catalog from the CLI or Dashboard UI. Each service in the service
+catalog contains at least one endpoint. Some have three endpoints which are URLs.
+
+:::
+
+
+## Service Catalog: Endpoint Types
+
+![The Service Catalog is queried to learn how to communicate with other services](images/slide_092_image_01.png){width="80%"}
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+The public URL is the public-facing endpoint for the service. The internal URL is the
+internal-facing endpoint for the service. It is usually the same as the public URL. This endpoint
+is used when components need to communicate, such as Nova validating an image with Glance.
+
+[pause 0.5s]
+
+The admin URL is the endpoint for service administration functions. The admin URL is not
+applicable to all components.
+
+[pause 0.5s]
+
+Each endpoint is associated with a region. Region is the name given to a collection of cloud
+services. The default is RegionOne. Service name refers to Keystone, Nova, Glance, and so on,
+while service type refers to identity, compute, image, and so on.
+
+:::
+
+
+## Service Catalog: Example
+
+<!-- ![Service Catalog Example](images/slide_093_image_01.png){width="80%"} -->
+![During VM deployment, nova-api retrieves the URL of the Glance service.](images/slide_093_image_01.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+This diagram shows how nova-api retrieves the URL of the Glance service from the service catalog
+during virtual machine deployment.
+
+[pause 0.5s]
+
+Nova queries the service catalog to get the endpoint URL for Glance, then uses that URL to send
+requests to Glance for image validation.
+
+[pause 0.5s]
+
+Note that services with less than three endpoints have been migrated to use Apache web server
+with mod_wsgi.
+
+:::
+
+
+## Service Catalog: Detail View
+
+![Service Catalog Detail](images/slide_094_image_01.png){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+This image shows a detailed view of the service catalog entries.
+
+[pause 0.5s]
+
+Each entry includes the service name, service type, region, and the endpoint URLs for public,
+internal, and admin interfaces.
+
+:::
+
+
+## Service Catalog Terminology
+
+Key terms:
+
+- Service: Special project containing component users (nova, glance, neutron)
+
+- Endpoint: Network accessible URL where service is accessed
+
+- Region: Geographical grouping of OpenStack components
+
+::: {.notes}
+
+[pause 1.0s]
+
+Every OpenStack implementation has a special project called service. When you define your
+Keystone environment, one of the tasks is to create this service. Each OpenStack component is
+represented by a user named for the component.
+
+[pause 0.5s]
+
+For example, nova is the user for the Compute service and is a member of the service project.
+Glance is the user for the Image service, neutron for the Network service, and so on. Those users
+are defined as members of the special service project.
+
+[pause 0.5s]
+
+Each OpenStack component must register endpoints with the service catalog. An endpoint is a
+network-accessible address, usually described by a URL, where a service may be accessed.
+
+[pause 0.5s]
+
+A region is a grouping of OpenStack components and can represent a geographical grouping of
+resources. Each region has its own full OpenStack deployment, including its own API endpoints,
+networks, and compute resources. Different regions share common services for Keystone and Horizon.
+
+:::
+
+
+## Defining Endpoints
+
+Registration process (done automatically):
+
+- Create or install the component
+- Create member in service project
+- Define one or more endpoints
+- Each endpoint is a URL for access
+
+::: {.notes}
+
+[pause 1.0s]
+
+Each OpenStack component, Nova, Glance, Neutron, Heat, and so on, must register with the service
+catalog.
+
+[pause 0.5s]
+
+To define an endpoint, you first need to create a service for the component. Next, create a
+member in the service project for the component. Members of the service project are users
+representing each component, such as nova, glance, neutron, heat, and so on.
+
+[pause 0.5s]
+
+Then define one or more endpoints. Each endpoint is a URL that represents how a service may be
+accessed.
+
+:::
+
+
+## Endpoint Types
+
+Each service has one or more endpoints:
+
+- Public URL: Public-facing endpoint
+
+- Internal URL: Internal-facing endpoint, usually same as public, used for inter-component
+  communication
+
+- Admin URL: Service administration functions, not applicable to all components
+
+::: {.notes}
+
+[pause 1.0s]
+
+Each service has one or more endpoints defined in the service catalog.
+
+[pause 0.5s]
+
+The public URL is the public-facing endpoint for the service. The internal URL is the
+internal-facing endpoint for the service. The internal URL is usually the same as the public URL
+and is used for inter-component communication, such as Nova validating an image with Glance.
+
+[pause 0.5s]
+
+The admin URL is used for service administration functions. It is not applicable to all
+components.
+
+:::
+
+
+## REST API Examples
+
+(optional) Reference documentation:
+
+https://docs.openstack.org/keystone/pike/api_curl_examples.html
+
+::: {.notes}
+
+[pause 1.0s]
+
+This link takes you to an OpenStack documentation page with several API examples using cURL that
+you can copy for your own use.
+
+[pause 0.5s]
+
+This lesson discusses how to use the OpenStack REST API by retrieving a valid token and then
+using that token in a GET request to display all projects.
+
+:::
+
+
+## OpenStack REST API
+
+REST API fundamentals:
+
+- Stateless client-server protocol
+- Implemented using HTTP
+- GET, PUT, POST, DELETE with JSON
+- Use --debug with CLI for learning
+- REST API calls require auth-token
+- Request token before making calls
+
+::: {.notes}
+
+[pause 1.0s]
+
+OpenStack operations can be performed from the command line interface, Horizon Dashboard UI, or
+through REST API calls. REST stands for REpresentational State Transfer. It is a stateless
+client-server protocol with a uniform interface for accessing the object model and is implemented
+using HTTP.
+
+[pause 0.5s]
+
+GET, PUT, POST, and DELETE are used in combination with JSON for data. In more straightforward
+terms, the REST API is the primary interface to issue commands to the OpenStack environment.
+
+[pause 0.5s]
+
+Be advised using REST API requires an auth-token. You must request a token before any REST API
+call. An easy way to learn REST API would be to use the OpenStack CLI command with the --debug
+option to display additional debug messages, including REST API calls.
+
+:::
+
+
+## REST API: Get Token
+
+<!-- ```bash
+curl -i -H "Content-Type: application/json" -d '
+{
+  "auth": {
+    "identity": {
+      "methods": ["password"],
+      "password": {
+        "user": {
+          "name": "admin",
+          "domain": {"id": "default"},
+          "password": "nova"
+        }
+      }
+    }
+  }
+}' "http://localhost/identity/v3/auth/tokens"
+``` -->
+![Get Token Example](images/REST API-GET TOKEN example.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+This shows an example REST API call to get a token. The token must be passed to any REST API
+request, such as GET PROJECTS.
+
+[pause 0.5s]
+
+In this example, we can see certain information about the authentication token generation. We
+supplied information about the request method, in this case password authentication.
+Additionally, we supply username, password, and domain information. The authentication token
+will be generated using this information.
+
+:::
+
+
+## REST API: Get Token Response
+
+<!-- ```text
+HTTP/1.1 201 Created
+Date: Mon, 24 Jun 2019 15:52:00 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Subject-Token: gAAAAABdEPGgf3W1GRf7bS3QW-BiWPGl...
+Content-type: application/json
+
+{"token": {
+  "issued_at": "2019-06-24T15:52:00.000000Z",
+  "expires_at": "2019-06-24T16:52:00.000000Z",
+  "methods": ["password"],
+  "user": {
+    "domain": {"id": "default", "name": "Default"},
+    "id": "5d17f317220a4774a487891d08a4125f",
+    "name": "admin"
+  }
+}}
+``` -->
+![ ](images/REST API-GET Token-RESPONSE.png)
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+This slide shows an example REST API response for a GET TOKEN request. The token is highlighted
+in the X-Subject-Token header. By default, the token is valid for one hour.
+
+[pause 0.5s]
+
+Within this output, we can see the token itself as well as token expiration information. This is
+the token that is used by all OpenStack applications and passed along to those services
+accordingly.
+
+:::
+
+
+## REST API: List Projects
+
+<!-- ```bash
+export OS_TOKEN=gAAAAABdEPGgf3WIGRf7bS3QW-BiWPGl...
+
+# Get Projects
+curl -s -H "X-Auth-Token: $OS_TOKEN" \
+    "http://localhost/identity/v3/projects" | python -mjson.tool
+``` -->
+
+![ ](images/GET PROJECTS.png)
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+The cURL command GET PROJECTS substitutes the actual token value in place of the OS_TOKEN
+variable shown in bold under the cURL command.
+
+[pause 0.5s]
+
+Often the authentication token will be captured as an environment variable so that it can be more
+easily recalled from the command line. This example shows a typical cURL request using an
+authentication token. You can see that the environment variable is used here in place of the
+actual authentication token. In this way, future API calls can be simplified or even scripted
+based on needs.
+
+:::
+
+
+## REST API: List Projects Response
+
+<!-- ```json
+{
+  "projects": [
+    {
+      "description": "",
+      "domain_id": "default",
+      "enabled": true,
+      "id": "4687c2c48fff4c41bfbd3b4cf69343de",
+      "is_domain": false,
+      "links": {
+        "self": "http://172.31.29.64/identity/v3/projects/..."
+      },
+      "name": "demo",
+      "parent_id": "default",
+      "tags": []
+    }
+  ]
+}
+``` -->
+
+![ ](images/GET PROJECTS Response.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here you can see an example REST API response for a GET PROJECTS request. In a typical
+environment, there are multiple projects. This example shows only the demo project and its unique
+ID number.
+
+:::
+
+
+# Troubleshooting CLI Requests
+
+::: {.notes}
+
+[pause 1.0s]
+
+This next section covers troubleshooting CLI requests.
+
+:::
+
+
+## Troubleshooting Overview
+
+Debugging without log files:
+
+- CLI client supports --debug option
+- API calls are displayed
+- Verify valid token received
+- Verify endpoints used
+- Verify API call syntax
+
+::: {.notes}
+
+[pause 1.0s]
+
+In many cases, you can troubleshoot an issue without looking at log files. The OpenStack CLI
+client supports a --debug option. This option displays API calls in the CLI.
+
+[pause 0.5s]
+
+This allows you to verify whether the request received a valid token, which endpoints were used
+for the request, and the syntax of the API calls for the request. Since you can see the API
+calls, you can use --debug to understand and learn the required OpenStack REST API calls.
+
+:::
+
+
+## CLI Debug Example: Request
+
+<!-- ```bash
+$ openstack --debug project list
+Auth plugin password selected
+...
+identity API version 3, cmd group openstack.identity.v3
+...
+command: project list -> openstackclient.identity.v3.project.ListProject
+GET call to http://127.0.0.1/identity
+Making authentication request to http://127.0.0.1/identity/v3/auth/tokens
+``` -->
+![ ](images/CLI-DebugExampleCommand.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+The --debug option displays a lot of data. Here we will focus on a subset of the data returned.
+In this situation, the OpenStack client has been set up to use password authentication.
+
+[pause 0.5s]
+
+At the bottom, you can see the GET request for a token.
+
+:::
+
+
+## CLI Debug Example: Token Response
+
+<!-- ```text
+http://127.0.0.1:80 "POST /identity/v3/auth/tokens HTTP/1.1" 201
+
+"expires_at": "2020-12-16T15:21:21.000000Z"
+"issued_at": "2020-12-16T14:21:21.000000Z"
+
+"catalog": [
+  {"endpoints": {
+    "id": "1fc541be3f6340119d503d4b80188734",
+    "interface": "admin",
+    "region_id": "RegionOne",
+    "url": "http://172.31.15.56/identity"
+  }}
+]
+``` -->
+![ ](images/CLI-DebugExampleOutput.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+In this example, you can see that a valid token was generated as indicated by the HTTP 201
+response. The token is valid for one hour as evidenced by the time differential between the
+issued_at and expires_at values.
+
+[pause 0.5s]
+
+The Service Catalog endpoints are included in the response. In this case, both the admin and
+public endpoints are in the same region and map to the same URL.
+
+:::
+
+
+## CLI Debug Example: API Call
+
+<!-- ```text
+REQ: curl -g -i -X GET http://172.31.15.56/identity/v3/projects?
+    -H "Accept: application/json"
+    -H "User-Agent: python-keystoneclient"
+    -H "X-Auth-Token: {SHA256}9786d07a6299391afb04c819..."
+
+http://172.31.15.56:80 "GET /identity/v3/projects HTTP/1.1" 200
+
+RESP BODY:
+{"id": "2e2c8e83c3b4446eb207c499422414f3", "name": "demo",
+ "domain_id": "default", "enabled": true...}
+``` -->
+![ ](images/CLI-DebugExampleGetRequest.png)
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+This example shows the GET request to list all projects. The token is identified as a hash value
+and not the real token for security purposes. An HTTP 200 response indicates success.
+
+[pause 0.5s]
+
+The response body contains details for each project. An example for the demo project is shown.
+
+:::
+
+
+## CLI Debug Example: Output
+
+<!-- ```text
++----------------------------------+--------------------+
+| ID                               | Name               |
++----------------------------------+--------------------+
+| 2482d512d0514971be925d035c79256b | swiftprojecttest4  |
+| 3961300c09bb4af7980426cc25c802d5 | swiftprojecttest1  |
+| 51ad39a676aa41adb1cbdea7c2154f74 | swiftprojecttest2  |
+| 52858f7437eb413583f5100354cb067b | service            |
+| 88b744c8a9ef4787a2e2f8c60a6c54a6 | invisible_to_admin |
+| 9852dc8ad89645da9715329317779eed | alt_demo           |
+| cf8fcce5f4b44fff86d68ad0871ba063 | demo               |
+| d2e0dcfb7dad4b6f8b51f2f2dc3c5794 | admin              |
++----------------------------------+--------------------+
+``` -->
+![ ](images/CLI-DebugExampleGetRequestOutput.png)
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+In this example, you can see the output of a REST API response for a GET PROJECTS request. In a
+typical environment, there are multiple projects.
+
+[pause 0.5s]
+
+Note that the ID for the demo project matches the ID of the project from the previous image.
+
+:::
+
+
+# Summary
+
+::: {.notes}
+
+[pause 1.0s]
+
+You have now gotten an overview of the role Keystone plays in OpenStack. Let us take a moment to
+review.
+
+:::
+
+
+## Identity Service Summary
+
+![Identity Service Summary](images/slide_115_image_01.jpg){width="80%"}
+
+::: {.notes}
+
+[pause 1.0s]
+
+To summarize, within a given domain, there can be multiple projects. Projects own the resources,
+for example, images, instances, and volumes. Users are assigned one or more roles within the
+context of their project, and users can be members of multiple projects with different roles.
+
+[pause 0.5s]
+
+User access to the resources is based on their role versus the defined policy. When a user is
+added to a project, they are assigned a role, such as admin, user, and so on. The role correlates
+to rules defined in the various policy.json files.
+
+[pause 0.5s]
+
+The user can perform operations on the resources owned by their project. Based on the rules in
+the policy.json files, users have access to perform specific operations, such as list users, boot
+a VM, and so on.
+
+[pause 0.5s]
+
+The user is authenticated and provided with an auth-token to use for their requested operation.
+
+:::
+
+
+## Module Summary
+
+You should now be able to:
+
+- Explain Identity service functions
+- Understand identity management
+- Authenticate with Keystone
+- Explain token management
+- Customize policies
+- Understand the service catalog
+- Use REST API for Identity (optional)
+
+::: {.notes}
+
+[pause 1.0s]
+
+You should now be able to explain each of the functions provided by the Identity service. These
+functions are identity management, including how to authenticate with Keystone, token management,
+policies including how to customize them, and the service catalog.
+
+[pause 0.5s]
+
+Optionally, you may have also learned how to use the REST API for Identity requests.
+
+[pause 0.5s]
+
+As you work through this next lab, you are encouraged to go back to these presentations and
+review the material as needed.
+
+:::
+
+
+# Identity Service (Keystone) Lab Exercise
+
+
+::: {.notes}
+
+[pause 1.0s]
+
+You are now ready to begin Lab 2, the Identity Service using Keystone. Work through the lab by
+carefully following each step.
+
+[pause 0.5s]
+
+You are encouraged to look back to the presentations in this module and earlier modules to
+refresh your memory and reinforce the concepts.
+
+[pause 0.5s]
+
+Good luck with Lab 2.
+
+:::
+

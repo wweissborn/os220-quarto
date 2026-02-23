@@ -1,0 +1,465 @@
+---
+title: "OS220: OpenStack Administration - Introduction"
+subtitle: "Course Overview, Agenda, and Prerequisites"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "OS220 - OpenStack Administration"
+    width: 1280
+    height: 720
+    margin: 0.1
+    transition: slide
+    background-transition: fade
+  pptx:
+    reference-doc: ./template.pptx
+    highlight-style: tango
+    slide-level: 2
+---
+
+## OS220: OpenStack Administration
+
+![](images/openstack-logo.png)
+
+::: {.notes}
+
+[pause 1.0s]
+
+Welcome to the OS220 OpenStack Administration and Operations course, developed by the Mirantis
+Training team.
+
+[pause 0.5s]
+
+This is a four day course covering the most commonly used OpenStack components, with lecture and
+lab exercises throughout.
+
+:::
+
+---
+
+## OS220 Course Description
+
+- Operate and administer clouds
+- Manage popular components
+- Implement Infrastructure as a Service
+- Master image to instance workflows
+- Configure networking and storage
+
+::: {.notes}
+
+[pause 1.0s]
+
+Welcome to the OS220 Course Description. This slide highlights what learners will gain from this
+course.
+
+[pause 0.5s]
+
+The OpenStack Administration and Operations course is designed to provide you with a complete
+experience administering and operating the most common OpenStack components. These components
+allow you to implement Infrastructure as a Service, commonly called I-A-A-S, in a private cloud.
+
+[pause 0.5s]
+
+You will learn everything from image management to instance creation, to network plugins and
+more. This is a comprehensive course covering the full lifecycle of OpenStack operations.
+
+:::
+
+---
+
+## OS220 Course Objectives
+
+:::::: {.columns}
+::: {.column width="50%"}
+- Use CLI and UI for OpenStack
+- Manage users, projects, and roles
+- Manage images and block storage
+- Launch and configure instances
+- Configure security and SSH keys
+:::
+::: {.column width="50%"}
+- Manage quotas effectively
+- Deploy with orchestration service
+- Integrate telemetry for autoscaling
+- Create Heat templates (optional)
+:::
+::::::
+
+::: {.notes}
+
+[pause 1.0s]
+
+Here are the high-level objectives for the OS220 course.
+
+[pause 0.5s]
+
+The OpenStack Administration and Operations course will teach you how to use the command line
+interface, also called C-L-I, and the user interface to gain hands-on experience with operating
+and managing OpenStack.
+
+[pause 0.5s]
+
+You will learn a variety of administrative tasks, including managing users, projects, roles,
+permissions, and quotas. You will also work with images, block storage, and volume services.
+
+[pause 0.5s]
+
+You will launch and configure instances, and learn how security groups and S-S-H keys protect
+your cloud resources.
+
+[pause 0.5s]
+
+You will use the orchestration service to deploy complex stacks, including integration with
+telemetry services for autoscaling. As an optional exercise, you may create a Heat template.
+
+[pause 0.5s]
+
+We use reference implementations throughout, keeping the content vendor agnostic.
+
+:::
+
+---
+
+## OS220 Target Audience
+
+- System and Network Administrators
+- Technical IT Professionals
+- Deployment Engineers
+- Cloud Administrators
+- Cloud Operations Personnel
+
+::: {.notes}
+
+[pause 1.0s]
+
+The typical course attendee is someone looking to gain a deeper understanding of OpenStack and
+its cloud ecosystem. This goes into more detail than what is offered in the OS100 course.
+
+[pause 0.5s]
+
+This can include a variety of people from different parts of the business. These roles may
+include system and network administrators, technical I-T professionals, deployment engineers,
+cloud administrators, and cloud operations personnel as they begin their technical journey using
+and working with OpenStack.
+
+:::
+
+---
+
+## Prerequisites: Knowledge
+
+- Basic Linux command line experience
+- OS100 or equivalent experience
+- Understanding of hypervisors
+- Networking and storage helpful
+
+::: {.notes}
+
+[pause 1.0s]
+
+Learners in this course are expected to come in with some baseline experience with the Linux
+command line and foundational knowledge of systems and network administration.
+
+[pause 0.5s]
+
+You should also have taken our OS100 OpenStack Essentials course, or have equivalent OpenStack
+experience. This includes use of OpenStack command line and user interfaces, as well as an
+understanding of hypervisors and virtualization.
+
+[pause 0.5s]
+
+An understanding of networking and storage virtualization is helpful as you undertake this
+course.
+
+:::
+
+---
+
+## Prerequisites: Lab Requirements
+
+- Web browser (Chrome or Firefox)
+- Account on Strigo.io
+- Disconnect from company VPN
+- SSH client (optional)
+
+::: {.notes}
+
+[pause 1.0s]
+
+For the lab exercises, you will need a computer with an internet connection and access to a
+web browser such as Google Chrome or Mozilla Firefox.
+
+[pause 0.5s]
+
+A Strigo.io lab environment is provided for the lab exercises. Please make sure you have an
+account set up before the course begins.
+
+[pause 0.5s]
+
+Also, please ensure you are disconnected from your company V-P-N during lab exercises. An
+S-S-H client will allow for additional options when attempting lab exercises, but that is
+optional.
+
+:::
+
+---
+
+## Course Structure
+
+- Four-day hands-on class
+- Complete administration experience
+- Real-world operational scenarios
+- Aligned with COA exam objectives
+
+::: {.notes}
+
+[pause 1.0s]
+
+This course is structured as a four-day hands-on class that provides complete component
+administration experience.
+
+[pause 0.5s]
+
+Throughout the course, you will work through real-world operational scenarios that mirror what
+you will encounter in production environments.
+
+[pause 0.5s]
+
+At the end of this course, with dedicated study and practice, you will have the skills required
+to pass the Certified OpenStack Administrator exam, also known as the C-O-A exam. The learning
+topics are specifically aligned with C-O-A exam objectives to help prepare you for certification.
+
+:::
+
+---
+
+## Course Delivery Format
+
+- 50% instructor-led presentations
+- 50% hands-on lab exercises
+- Labs follow each lecture section
+- Real-world practice scenarios
+
+::: {.notes}
+
+[pause 1.0s]
+
+This course is structured in two parts. Fifty percent of the course will be instructor-led
+presentations, and the other fifty percent of the time will be spent on hands-on lab exercises.
+
+[pause 0.5s]
+
+After each section, there will be a lab exercise to give learners hands-on experience with the
+technologies discussed in the lectures.
+
+:::
+
+---
+
+## Vendor Agnostic Approach
+
+- No proprietary add-ons used
+- LVM for Block Storage
+- Open vSwitch for L2 networking
+- KVM and QEMU for hypervisor
+
+::: {.notes}
+
+[pause 1.0s]
+
+All Mirantis OpenStack courses are vendor agnostic. This is an important distinction.
+
+[pause 0.5s]
+
+Tasks are performed in an OpenStack environment without any vendor add-ons that might change
+the way OpenStack works. We use reference implementations throughout the course. Reference
+implementations are the default or standard implementations that come with OpenStack.
+
+[pause 0.5s]
+
+Specifically, we use Logical Volume Manager, or L-V-M, for Block Storage. We use Open vSwitch,
+also called O-V-S, for Layer 2 networking. And we use K-V-M and Q-E-M-U for the hypervisor.
+
+[pause 0.5s]
+
+This approach ensures that the skills you learn apply to any OpenStack distribution, not just a
+specific vendor implementation. Whether your organization uses Red Hat OpenStack, Canonical
+Charmed OpenStack, or Mirantis OpenStack, the skills you learn here will transfer directly.
+
+:::
+
+---
+
+## Course Outline
+
+- Keystone (Identity service)
+- Glance (Image service)
+- Neutron (Networking service)
+- Nova (Compute service)
+- Cinder (Block storage service)
+- Heat (Orchestration service)
+- Octavia (Load Balancer service)
+- Ceilometer (Telemetry)
+- Aodh (Alarming)
+- Gnocchi (Metrics)
+
+::: {.notes}
+
+[pause 1.0s]
+
+This is an overview of what is covered in the OpenStack Administration and Operations course.
+
+[pause 0.5s]
+
+We will cover Keystone for identity management, Glance for image management, Neutron for
+networking, Nova for compute, and Cinder for block storage.
+
+[pause 0.5s]
+
+We will also cover Heat for orchestration, Octavia for load balancing as a service, and the
+telemetry services including Ceilometer, Aodh, and Gnocchi.
+
+[pause 0.5s]
+
+We will go into greater detail on each of these topics in the upcoming modules.
+
+:::
+
+---
+
+## Agenda: Day 1
+
+- Module 1: Agenda and Introductions
+- Module 2: Keystone (Identity)
+- Lab 1: The lab environment
+- Lab 2: Identity service
+- Module 3: Glance (Image service)
+- Lab 3: Image service
+
+::: {.notes}
+
+[pause 1.0s]
+
+On Day 1, we will begin with introductions and an overview of the course agenda.
+
+[pause 0.5s]
+
+Then we will dive into Keystone, the identity service, with two associated labs. Lab 1 will
+familiarize you with the lab environment, and Lab 2 will cover Keystone operations.
+
+[pause 0.5s]
+
+We will finish Day 1 with Glance, the image service, and its corresponding lab.
+
+:::
+
+---
+
+## Agenda: Day 2
+
+- Module 4: Neutron (Network service)
+- Lab 4a: The Networking service
+- Lab 4b: External network connection
+- Lab 4c: Neutron under the hood
+
+::: {.notes}
+
+[pause 1.0s]
+
+Day 2 is dedicated entirely to Neutron, the networking service.
+
+[pause 0.5s]
+
+Networking is a complex topic that deserves focused attention. We have three labs for this
+module. Lab 4a covers basic Neutron operations. Lab 4b explores external network connections
+to virtual machines. And Lab 4c takes you under the hood to understand how Neutron works
+internally.
+
+:::
+
+---
+
+## Agenda: Day 3
+
+- Module 5: Nova (Compute service)
+- Lab 5: Nova compute operations
+- Module 6: Cinder (Block storage)
+- Lab 6: Block storage service
+
+::: {.notes}
+
+[pause 1.0s]
+
+On Day 3, we cover Nova, the compute service, which is responsible for managing virtual
+machine instances.
+
+[pause 0.5s]
+
+You will learn how to launch, manage, and troubleshoot instances. Then we move on to Cinder,
+the block storage service, which provides persistent storage volumes for your instances.
+
+[pause 0.5s]
+
+Each module includes hands-on lab exercises to reinforce the concepts.
+
+:::
+
+---
+
+## Agenda: Day 4
+
+- Module 7: Heat (Orchestration)
+- Lab 7: Heat orchestration
+- Module 8: Octavia (LBaaS)
+- Lab 8: Octavia load balancing
+- Module 9: Ceilometer (Telemetry)
+
+::: {.notes}
+
+[pause 1.0s]
+
+On Day 4, we cover Heat, the orchestration service, which allows you to deploy complex
+multi-resource stacks using templates.
+
+[pause 0.5s]
+
+Then we explore Octavia for load balancing as a service, also known as L-B-A-A-S, which
+distributes traffic across multiple instances.
+
+[pause 0.5s]
+
+We conclude with Ceilometer and the telemetry services, which provide monitoring and metering
+capabilities for your OpenStack environment.
+
+:::
+
+---
+
+## Student Introductions
+
+- Your name
+- Current role in your company
+- OpenStack or cloud experience
+- Virtualization background
+
+::: {.notes}
+
+[pause 1.0s]
+
+Now let us take a few moments for introductions.
+
+[pause 0.5s]
+
+Please share your name, your current role in your company, and any experience you have with
+OpenStack, other cloud providers, or virtualization technologies.
+
+[pause 0.5s]
+
+This helps the instructor understand the background of the class and tailor examples
+accordingly.
+
+:::
+
+---

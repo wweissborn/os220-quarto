@@ -1,0 +1,951 @@
+---
+title: "Module 5: Cinder"
+subtitle: "OS220: OpenStack Block Storage Service"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "OS220 - OpenStack Administration"
+    width: 1280
+    height: 720
+    margin: 0.1
+    transition: slide
+    background-transition: fade
+  pptx:
+    reference-doc: ./template.pptx
+    highlight-style: tango
+    slide-level: 2
+footer: © Mirantis Training - OS220 - OpenStack Administration"
+
+---
+
+# Openstack Cinder {.center}
+
+# (Block Storage/Volume Service) {.center}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 365 diagram](images/slide_365_image_01.png){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 365 diagram](images/slide_365_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+This lecture discusses the OpenStack Block Storage service, Cinder. Cinder is designed to present storage resources (or volumes) to end users that can be consumed by the OpenStack Compute Project (Nova). The storage volumes can be attached to virtual machine instances at deploy‐time or after deployment.
+Cinder processes interface with plugin drivers for the various types of storage (LVM/iSCSI, NFS, plus other vendors storage).
+:::
+
+---
+
+At the end of this presentation, you should be able to:
+Use volumes, snapshots, and backups
+Know where to look for information related to vendor backends
+Describe the Cinder scheduling process
+Define and use a boot volume
+
+# Objectives - Cinder {.center}
+
+366
+
+::: {.notes}
+At the end of this presentation, you should be able to use volumes, snapshots, and backups; know where to look for information related to vendor backends; describe the Cinder scheduling process; and define and use a boot volume.
+As a starting point, keep in mind that Cinder is similar to the Amazon EC2 Elastic Block Storage (or EBS) offering. Cinder is open source software that presents and manages storage resources to end users so the storage can be used by other components of OpenStack, especially Nova. Cinder provisions and manages block devices known as Cinder volumes.
+:::
+
+---
+
+# Cinder - Deploy Instance Flow {.center}
+
+User logs in to UI (authenticates with Keystone)
+Selects “Launch Instance”
+Provides required parameters
+Launches instance
+
+Optionally,
+add block storage to VM
+
+Authenticates token
+
+
+::: {.notes}
+Here you can see how Cinder fits into the flow chart of our deploy instance workflow. Attaching a Cinder volume is an optional step in the deploy process. When you deploy an instance, you might include additional non-root disks (or volumes) to attach to the instance using the Cinder Volume service.
+The volume might already exist, or it can be created at the same time. Once the volume exists, it can be attached to the instance.
+:::
+
+---
+
+# Cinder Architecture {.center}
+
+# Block Storage/Volume Service {.center}
+
+::: {.notes}
+In this section, we will take a closer look at Cinder’s architecture, block storage, and volume service.
+Cinder, the OpenStack Block Storage service, virtualizes pools of block storage that can be used with (that is, attached to) virtual machine instances. Users can attach the storage which are typically referred to as volumes. Users do not need much knowledge of where the storage is deployed, what type of device is used, etc. Cinder evolved from the nova‐volume service.
+Cinder volumes are persistent. Once created, they can be attached, detached, then attached to a different virtual machine. Data stored on Cinder volumes is not deleted unless it is deleted or the volume is deleted. Cinder supports multiple back‐ends for many vendors through the use of plugin drivers.
+A Cinder volume might contain a fully bootable instance of an operating system. When that is the case, users can boot VM instances from the volume.
+:::
+
+---
+
+# Cinder (Block Storage/Volume Service) {.center}
+
+![Slide 369 diagram](images/slide_369_image_01.png){width="80%"}
+
+::: {.notes}
+Here is a more detailed diagram of the Cinder architecture.
+Cinder Block Storage service is an optional component. It virtualizes blocks of storage from many vendors. Several vendors provide backends for Cinder: For example, EMC, IBM, Hitachi, Oracle, VMware, Lenovo, HP, Dell, Citrix, and NetApp all support Cinder.
+Let’s walk through the various components that make up Cinder.
+Starting in the upper left of the diagram, the cinder-api accepts API requests from the CLI, REST API, or Horizon Dashboard and routes those requests to the scheduler or backup services.
+To the right of that, cinder-scheduler schedules and routes requests to the appropriate cinder‐volume service. Depending upon your configuration, this may be simple round‐robin scheduling to the running volume services, or it can be more sophisticated through the use of the Filter Scheduler.
+On the bottom left, cinder-volume manages a variety of storage providers (or backends) and devices through a pluggable driver architecture. cinder-volume responds to requests to read from and write to the Block Storage database to maintain state. It also interacts with other processes such as cinder‐scheduler through a message queue and directly on block storage.
+Below cinder-volume on the diagram, you’ll see the backend storage. Cinder requires at least 1 form of backend storage. The default implementation is Logical Volume Manager (LVM) with iSCSI devices. Other backends are supported through drivers that are downloaded from the OpenStack Marketplace, such as: EMC, NetApp, IBM, and so on.
+The bottom right side of the diagram shows cinder-backup. This provides a means to backup Block Storage volumes. For example, cinder-backup can backup volumes as objects in the OpenStack Object Storage (or Swift) service. Ceph, GlusterFS, and others are supported as well.
+Visit the OpenStack Marketplace for a list of supported storage backends. You can also find a support matrix on OpenStack.org.
+https://www.openstack.org/marketplace/drivers#project=cinder%20(block%20storage) 
+https://docs.openstack.org/cinder/latest/reference/support-matrix.html
+:::
+
+---
+
+A Cinder volume is a persistent virtualized block storage device
+Conceptually similar to a USB drive
+Independent of any particular virtual machine instance
+Created by user as raw block device with no partition table and no filesystem
+Must be formatted, based on backend used
+Can be attached to multiple instances at a time (new in Queens release), as secondary storage or root store
+Not all backend drivers support multi-attached volumes
+For example, the Ceph driver added support in the Stein release
+May be detached, then reattached, to either the same or different instance while retaining all data
+An instance can have multiple volumes
+
+# Cinder Volumes - Overview {.center}
+
+370
+
+::: {.notes}
+A Cinder volume is a persistent virtualized block storage device. It is conceptually similar to a USB drive and is independent of any particular virtual machine instance.
+A Cinder volume is created by the user as a raw block device with no partition table and no filesystem. It must be formatted, based on the backend used.
+It can be attached to multiple instances at a time as secondary storage or root store. This is new in the Queens release. Bear in mind that not all backend storage drivers support multi-attached volumes. For example, the Ceph driver only added support for this in the Stein release.
+Cinder volumes may be detached, then reattached, to either the same or a different instance while retaining all data. An instance can have multiple volumes.
+For more details related to multi-attach volumes, see the documentation on OpenStack.org.
+ https://docs.openstack.org/cinder/latest/admin/blockstorage-volume-multiattach.html
+:::
+
+---
+
+Snapshot: persistent, read-only, copy of a volume
+Created from current volume (must be detached from any instance) To restore, you must create a new volume
+Backup: archived copy of snapshot, stored in backup storage
+Detach volume, take snapshot, then create backup from snapshot
+Resize: can grow a volume, but not shrink
+Detach from instance
+openstack volume set volume_name --size new_size
+Ownership: Unique process to transfer ownership across projects
+Boot volume: special class of volume
+Contains image disk file
+Can be selected as the boot source for an instance
+Volume types: Can be used to define QoS or for costing
+
+Snapshots, backups, etc.
+
+371
+
+::: {.notes}
+Here is an overview of some of the terminology and processes that will come up in this module and in the lab related to backups.
+A snapshot is a persistent read-only copy of a volume. It is created from a current volume which must be detached from any instance. To restore from a snapshot, you must create a new volume from the snapshot.
+A Backup is an archived copy of a snapshot that is stored in backup storage. To restore from a backup, you must detach the volume, take a snapshot, and then create a new volume from the snapshot.
+Resize means to grow a volume, but not shrink. When you resize, you need to detach from the instance and use the command openstack volume set volume_name --size new_size.
+Ownership refers to a unique process to transfer ownership across projects.
+A Boot volume is a special class of volume that contains an image disk file. A boot volume can be selected as the boot source for an instance.
+Volume types can be used to define QoS or for costing.
+You will use volumes, snapshots, boot volumes, etc. in the lab exercises.
+:::
+
+---
+
+Content of boot volume is an image disk file
+
+openstack volume create –image cirros-0.4.0-x86_64-disk –bootable  --size 1 cirros-bootvol
+
+Can be used as the boot source for an instance, instead of specifying an image
+  - openstack server create --volume cirros-bootvol --flavor m1.tiny ... myserver
+Additional options (cinder.conf):
+  - Using compressed images for boot volumes
+  - allow_compression_on_image_upload = True compression_format = gzip | QAT
+Enable image-volume cache
+  - image_volume_cache_enabled = True
+
+Boot volumes
+
+372
+
+::: {.notes}
+Here are some commands you will use when working with boot volumes.
+ 
+To create a boot volume where the content is an image disk file use the command openstack volume create --image cirros-0.4.0-x86_64-disk --bootable --size 1 cirros-bootvol 
+To create a boot volume that can be used as the boot source for an instance, instead of specifying an image use the command openstack server create --volume cirros-bootvol --flavor m1.tiny ... myserver. Note that some customers use boot volumes exclusively.
+You can edit the cinder.conf file with these settings. By default, compression is disabled. To use compressed images for boot volumes, set allow_compression_on_image_upload = True and compression_format = gzip | QAT. To enable image-volume cache, set image_volume_cache_enabled = True.
+gzip is software-based compression. It requires GUNzip package.
+QAT (which stands for QuickAssist Technology) is a hardware accelerator from Intel. It requires the installation of a QAT driver and the QATzip compression library. QAT produces a compressed file in gzip format.
+The image-volume cache caches the image for use with subsequent volume create requests.
+:::
+
+---
+
+cinder-volume works with many block storage (vendor) backends
+cinder-volume provides generic APIs
+create, delete, clone, snapshot, and so on
+Vendor drivers perform the actions
+Backends and drivers are defined in cinder.conf
+
+# Volume Drivers {.center}
+
+373
+
+![Slide 373 diagram](images/slide_373_image_01.jpg){width="80%"}
+
+::: {.notes}
+- The diagram here shows how the cinder-volume service uses drivers to attach storage.
+- cinder-volume works with many block storage (vendor) backends and provides generic APIs.
+- cinder-volume is used to create, delete, clone, snapshot, and so on.
+- Several vendors provide backends for Cinder including EMC, IBM, Hitachi, Oracle, VMware, Lenovo, HP, Dell, Citrix, and NetApp.
+- Backends and drivers are defined in cinder.conf
+Typically, the cinder-volume process runs on a separate node from the controller. You might choose to run one cinder-volume process with multiple backends or run multiple cinder-volume processes on their own storage nodes.
+A list of supported volume drivers can be found on OpenStack.org:
+    https://docs.openstack.org/cinder/latest/drivers.html#volume-drivers
+:::
+
+---
+
+# volume_group must match an LVM Volume Group name
+volume_group = stack-volumes-lvmdriver-1
+volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
+...
+
+Defining volume drivers - cinder.conf
+
+374
+
+::: {.notes}
+Here you can see an example config file that is used to define the LVM driver, which is the default, and the NFS driver.
+Each volume driver has differing definitions. Check out the OpenStack.org documentation covering configuration information for each of the supported volume drivers:
+    https://docs.openstack.org/cinder/latest/drivers.html#
+:::
+
+---
+
+# Volume Backend Drivers (Reference) {.center}
+
+![Slide 375 diagram](images/slide_375_image_01.jpg){width="80%"}
+
+::: {.notes}
+This list of available backend drivers is here as a reference. Go to the OpenStack.org documentation for the most up to date list as well as links for further details on each driver.To define a volume driver, you need to edit cinder.conf and set the volume_driver property. For example, to define the default LVM driver set volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver in cinder.conf.
+Note that the functionality provided by drivers is not 100% similar. Exact volume provisioning and attachment flow depends on the driver implementation and what hypervisor is used. Most features are developed and tested with LVM over ISCSI and KVM.
+The current list of backend drivers with links to configuration information can be found on OpenStack.org.
+   https://docs.openstack.org/cinder/ussuri/configuration/block-storage/volume-drivers.html
+:::
+
+---
+
+https://docs.openstack.org/cinder/ussuri/reference/support-matrix.html
+
+Support matrix (reference)
+
+376
+
+![Slide 376 diagram](images/slide_376_image_01.png){width="80%"}
+
+::: {.notes}
+The information here is intended as reference. Use the provided URL to view the detailed driver support matrix with the backend driver and the functions/features that are supported.
+    https://docs.openstack.org/cinder/ussuri/reference/support-matrix.html
+:::
+
+---
+
+# Logical Volume Manager (Lvm) {.center}
+
+# A Brief Introduction {.center}
+
+::: {.notes}
+This next section will provide a brief introduction to the Logical Volume Manager or LVM. LVM is the 2nd most popular choice among customers for their volume backend. Ceph is the 1st choice.
+Your lab environment is configured with LVM
+:::
+
+---
+
+LVM: Logical Volume Manager for Linux kernel
+Administrator
+Creates physical volumes (PVs) Pooled in volume groups (VGs)
+Can add more physical volumes, resizing volume group
+Using UI or CLI, create LVs openstack volume create …
+Can resize logical volume (LV)
+A logical volume might span multiple physical volumes
+
+# Lvm Overview {.center}
+
+378
+
+![Slide 378 diagram](images/slide_378_image_01.png){width="80%"}
+
+::: {.notes}
+This diagram shows how LVM interfaces with physical volumes.
+LVM is the Logical Volume Manager for the Linux kernel. LVM is an administrator that can create physical volumes (also known as PVs) and pool them in volume groups (also known as VGs), as well as add more physical volumes and resize volume group.
+Using the UI or the CLI, you can create logical volumes. In the CLI, you do so with the command openstack volume create …. You can also resize a logical volume. A logical volume might span multiple physical volumes
+The Logical Volume Manager (or LVM) creates an abstraction layer over the physical storage (or disks). Users do not need to know the details of the physical layer. For example, as shown in the diagram, a pool of 24GB of storage is available from the volume group for use, but that 24GB logical volume group is actually made up of three 8GB physical drives.
+Suppose you use the openstack volume create command to create a 1 GB Cinder volume. The cinder-volume process uses the LVMVolumeDriver (as defined in cinder.conf) to create and manage the 1 GB volume.
+:::
+
+---
+
+LVM commands
+
+![Slide 379 diagram](images/slide_379_image_01.png){width="80%"}
+
+::: {.notes}
+Here you can see a number of the LVM commands you will need as you work with Cinder and LVM. Let’s go over each of them. Note that sudo is required.
+pvcreate initializes physical volumes for later use by the Logical Volume Manager (LVM).
+Use the pvs command to display the physical volumes summary. In this case, there are two physical volumes allocated, each with 20GB of space. One volume is for /dev/loop1 and the other is for /dev/loop2.
+vgcreate allocates the physical volumes to a volume group, in this case stack-volumes-lvmdriver-1. The name, stack-volumes-lvmdriver-1, must match the volume-group property specified in the cinder.conf file.
+Use the vgs command to display the volume groups summary information. Notice that in this case, the total volume group size (or VSize) is 20GB with 20GB free (as shown under the VFree heading).
+- Use the lvs command to display a summary of all logical volumes.
+- In this example, there are five Cinder (or logical) volumes created for a total of 9GB.
+- Using the lvs command does not provide you with the project associated with the logical volumes.
+- You should manage logical volumes from OpenStack using the CLI or UI.
+- Depending upon the release of LVM that you are running, you might see a pool in the list of volumes.
+- If so, the pool is associated with the volume group.
+:::
+
+---
+
+CINDER-SCHEDULER
+
+::: {.notes}
+This next section covers cinder-scheduler. If you are running multiple volume backends, the cinder-scheduler process is required to select the appropriate backend for your volumes.
+:::
+
+---
+
+Filters (see URL) remove backends that are not suitable for volume request
+
+Weights (see URL) prioritize list of backends to satisfy volume request
+
+Scheduler is required with multiple storage backends
+Determines which storage backend to use based on filters and weights
+
+Cinder-scheduler
+
+docs.openstack.org/cinder/ussuri/configuration/block-storage/scheduler-filters.html docs.openstack.org/cinder/ussuri/configuration/block-storage/scheduler-weights.html
+
+381
+
+![Slide 381 diagram](images/slide_381_image_01.jpg){width="80%"}
+
+::: {.notes}
+The cinder-scheduler is required with multiple storage backends. It determines which storage backend to use based on filters and weights. Filters remove backends that are not suitable for the volume request, and weights then prioritize the resulting list of backends to satisfy the volume request. See the provided URLs for more details on filtering and weights.
+There are several available filters.
+The AvailabilityZoneFilter filters backends by availability zone. The CapabilitiesFilter is a BackendFilter that works with resource (meaning instance & volume) type records. The CapacityFilter filters based on the volume backend’s capacity utilization. DifferentBackendFilter schedules the volume on a different backend from a set of volumes.
+DriverFilter filters the backend based on a ‘filter function’ and metrics.
+InstanceLocalityFilter schedules the volume on the same host (or hypervisor) as a given instance. The JsonFilter is a backend filter for simple JSON-based grammar for selecting backends. The RetryFilter filters out previously attempted hosts. Finally, the SameBackendFilter schedules the volume on the same back-end as another volume.
+There are also several available weights.
+- The AllocatedCapacityWeigher weights hosts by their allocated capacity.
+- The CapacityWeigher weights hosts by their virtual or actual free capacity and is the default weight.
+- The Chance Weigher assigns random weights to hosts.
+- The GoodnessWeigher assigns weights based on a host’s goodness function as rated from 0 (meaning a poor choice) to 100 (meaning a perfect choice).
+- Finally the VolumeNumberWeigher weights hosts by volume number in backends.
+For more information about scheduler filters and weights, see the documentation on OpenStack.org.
+http://docs.openstack.org/cinder/ussuri/configuration/block-storage/scheduler-filters.html 
+http://docs.openstack.org/cinder/ussuri/configuration/block-storage/scheduler-weights.html
+:::
+
+---
+
+enabled_backends=lvmdriver-1,lvmdriver-2,lvmdriver-3
+[lvmdriver-1] volume_group=cinder-volumes-1
+volume_driver=cinder.volume.drivers.lvm.LVMVolumeDriver volume_backend_name=LVM
+[lvmdriver-2]
+volume_group=cinder- olumes-2
+volume_driver=cinder.volume.drivers.lvm.LVMVolumeDriver volume_backend_name=LVM
+[lvmdriver-3]
+volume_group=cinder-volumes-3
+volume_driver=cinder.volume.drivers.lvm.LVMVolumeDriver volume_backend_name=LVM_b
+
+3 LVM backends
+2 using LVM backend
+1 using LVM_b backend
+Each backend driver has a unique volume_group name Assumptions:
+Each LVM backend has an equal amount of storage: 8GB
+LVM_b backend has 10GB
+Each backend has the same weight
+
+Cinder-scheduler example (1)
+
+ussuri-1.5 © 2021 Mirantis, Inc.
+
+382
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![Slide 382 diagram](images/slide_382_image_01.jpg){width="90%"}
+:::
+
+::: {.column width="50%"}
+![Slide 382 diagram](images/slide_382_image_02.png){width="90%"}
+:::
+
+::::
+
+::: {.notes}
+Here is an example of a cinder-scheduler. As you can see, there are three LVM backends; two use the LVM backend and one uses the LVM_b backend. Each backend driver has a unique volume_group name. Some assumptions are that each LVM backend has an equal amount of storage of 8GB, that the LVM_b backend has 10GB, and that each backend has the same weight.
+In this configuration, lvmdriver-1 and lvmdriver-2 have the same volume_backend_name, LVM. If a volume creation requests the LVM back end name, the scheduler uses the capacity filter scheduler to choose the most suitable driver, which is either lvmdriver-1 or lvmdriver-2. The capacity filter scheduler is enabled by default. The next section provides more information about this example.
+In addition, this example presents an lvmdriver-3 back end. The following slides show the filtering and scheduling process.
+:::
+
+---
+
+openstack volume create --type LVM --size 1 myvol1
+
+cinder-scheduler receives request. Filters for all LVM backend names
+Removes LVM_b backend. Regardless of capacity
+Sorts based on weight (capacity) lvmdriver-1: 8GB
+lvmdriver-2: 8GB
+Since both have same capacity (weight), scheduler randomly selects a backend
+lvmdriver-1
+
+Cinder-scheduler example (2)
+
+383
+
+![Slide 383 diagram](images/slide_383_image_01.png){width="80%"}
+
+::: {.notes}
+Here you can see how the Capacity Weigher weighs hosts by their virtual or actual free capacity. The default is to spread volumes across all hosts evenly. Note that if you prefer stacking, you can set the capacity_weight_multiplier option to a negative number and the weighing has the opposite effect of the default behavior.
+- By using the command openstack volume create --type LVM --size 1 myvol1 the following occurs.
+- The cinder-scheduler receives the request.
+- It then filters for all LVM backend names and removes LVM_b backend regardless of capacity.
+- Next the cinder-schedulers sorts based on weight.
+- In this case, capacity is the key factor.
+- Since both lvmdriver-1 and lvmdriver-2 have the same capacity of 8GB, the scheduler randomly selects a backend.
+- In this case, lvmdriver-1 is selected.
+:::
+
+---
+
+openstack volume create --type LVM --size 1 myvol2
+
+cinder-scheduler receives request Filters for all LVM backend names
+Removes LVM_b backend Sorts based on weight (capacity)
+lvmdriver-2: 8GB lvmdriver-1: 7GB
+Based on more capacity, selects lvmdriver-2
+
+Cinder-scheduler example (3)
+
+384
+
+![Slide 384 diagram](images/slide_384_image_01.png){width="80%"}
+
+::: {.notes}
+This is continued from the previous example. In this case, another openstack volume create command is issued. However, this time, driver-2 is selected due to its larger capacity.
+:::
+
+---
+
+# Volume Types {.center}
+
+385
+
+WHAT ARE THEY?
+WHY DO YOU NEED THEM? HOW DO YOU DEFINE THEM?
+
+::: {.notes}
+This next section will address volume types including what they are, why you need them, and how you define them.
+:::
+
+---
+
+You can use volume types to define characteristics for your backends, such as:
+Quality of service:
+Gold, Silver, or Bronze (you pick the name) Type of backend:
+LVM, Ceph, NetApp SolidFire, VMware, and so on Geographic location of backend:
+US-West, Europe-UK, Tokyo, and so on Plus, you can associate a cost with each
+There might be a default volume type defined:
+
+[DEFAULT]
+default_volume_type =  lvmdriver-1
+...
+[lvmdriver-1]
+...
+volume_group = stack-volumes-lvmdriver-1
+
+To create a volume using the default volume type, do not specify a type:
+openstack volume create --size size_GB volume_name
+
+Volume types
+
+386
+
+::: {.notes}
+- You can use volume types to define characteristics for your backends.
+- These characteristics include quality of service, which are Gold, Silver, or Bronze (you can pick the name); the type of backend, which are LVM, Ceph, NetApp SolidFire, VMware, and so on; and the geographic location of backend, which would be US-West, Europe-UK, Tokyo, and so on.
+- You can also associate a cost with each of these characteristics.
+There might be a default volume type defined as shown here. In this case, the default volume type is lvmdriver-1. To create a volume using the default volume type, do not specify a type, as shown in the command openstack volume create --size size_GB volume_name. When you use the default volume type, lvmdriver-1 in this example, you do not need to specify it on the command line or in the UI.
+:::
+
+---
+
+First, define the volume types in cinder.conf:
+[backend1]
+# highest speed/best perf = highest cost
+volume_backend_name = lvmGold
+...
+[backend2]
+# middle tier speed/best perf = middle tier cost
+volume_backend_name = lvmSilver
+...
+[backend3]
+# lowest speed/best perf = lowest cost
+volume_backend_name = lvmBronze
+...
+[backend4]
+# LVM backend in CA
+volume_backend_name = US-West-LVM
+...
+...
+
+Create and use volume types
+
+387
+
+::: {.notes}
+The first step is to define the volume types desired in the cinder.conf file as shown here.
+:::
+
+---
+
+Next, you must define an extra spec (property) for each volume type and map it to one of the volume_backend_name you defined:
+
+openstack volume type set --property 'volume_backend_name = lvmGold' GOLD
+openstack volume type set --property 'volume_backend_name = lvmSilver' SILVER
+openstack volume type set --property 'volume_backend_name = lvmBronze' BRONZE
+
+To create a volume, specify the volume type (GOLD, SILVER, BRONZE)
+
+openstack volume create --type volume_type --size size_GB volume_name
+
+Create and use volume types
+
+388
+
+::: {.notes}
+Next, you must define an extra spec (or property) for each volume type and map it to one of the volume_backend_name[s] you defined. 
+    openstack volume type set --property 'volume_backend_name = lvmGold' GOLD    openstack volume type set --property 'volume_backend_name = lvmSilver' SILVER    openstack volume type set --property 'volume_backend_name = lvmBronze' BRONZE
+To create a volume, specify the volume type (that is GOLD, SILVER, or BRONZE). To do so, use the command openstack volume create --type volume_type --size size_GB volume_name
+Note that the volume type name does not need to be uppercase. The examples shown here use uppercase to highlight the name more easily.
+:::
+
+---
+
+# Miscellaneous Topics {.center}
+
+::: {.notes}
+This next section will cover miscellaneous topics related to managing volumes.
+:::
+
+---
+
+When using LVM, the volume group (VG) name must match config file:
+
+/etc/cinder/cinder.conf:
+
+Volume group name
+
+390
+
+$ sudo vgs
+VG                        #PV #LV #SN Attr   VSize   VFree
+stack-volumes-lvmdriver-1   1   1   0 wz--n- <30.00g 1.43g
+
+…
+[lvmdriver-1]
+image_volume_cache_enabled = True
+…
+volume_group = stack-volumes-lvmdriver-1
+volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
+volume_backend_name = lvmdriver-1
+…
+
+::: {.notes}
+When using LVM, the volume group (or VG) name must match the cinder configuration file setting. The VG name can be found by using the command vgs. Edit the cinder.conf file as shown to match.
+:::
+
+---
+
+Creating a boot volume
+
+Boot volume notes
+
+391
+
+$ openstack volume create --image cirros-0.6.2-x86_64-disk --bootable --size 1 myboot
+
++---------------------+--------------------------------------+
+| Field               | Value                                |
++---------------------+--------------------------------------+
+| attachments         | []                                   |
+| availability_zone   | nova                                 |
+| bootable            | false                                |
+| consistencygroup_id | None                                 |
+| created_at          | 2025-08-04T20:52:04.940327           |
+| description         | None                                 |
+| encrypted           | False                                |
+| id                  | 7f947cb5-7590-4259-9d0a-d35eb9127460 |
+| migration_status    | None                                 |
+| multiattach         | False                                |
+| name                | myboot                               |
+| properties          |                                      |
+| replication_status  | None                                 |
+| size                | 1                                    |
+| snapshot_id         | None                                 |
+| source_volid        | None                                 |
+| status              | creating                             |
+| type                | lvmdriver-1                          |
+| updated_at          | None                                 |
+| user_id             | 0a6895485794400ebd05b0d8b42bbc67     |
++---------------------+--------------------------------------+
+
+::: {.notes}
+To create a boot volume, use the command openstack volume create as shown here.
+This will create two volumes. You can check the details on those by using the command openstack volume list --all
+In this example the boot volume is myboot. There is a second volume that uses the image ID in the name. It is owned by the service project and is a read only, non-bootable copy of the volume.
+:::
+
+---
+
+Creating a boot volume
+
+Boot volume notes
+
+392
+
+$ openstack volume create --image cirros-0.6.2-x86_64-disk --bootable --size 1 myboot
+
++---------------------+--------------------------------------+
+| Field               | Value                                |
++---------------------+--------------------------------------+
+| attachments         | []                                   |
+| availability_zone   | nova                                 |
+| bootable            | false                                |
+| consistencygroup_id | None                                 |
+| created_at          | 2025-08-04T20:52:04.940327           |
+| description         | None                                 |
+| encrypted           | False                                |
+| id                  | 7f947cb5-7590-4259-9d0a-d35eb9127460 |
+| migration_status    | None                                 |
+| multiattach         | False                                |
+| name                | myboot                               |
+| properties          |                                      |
+| replication_status  | None                                 |
+| size                | 1                                    |
+| snapshot_id         | None                                 |
+| source_volid        | None                                 |
+| status              | creating                             |
+| type                | lvmdriver-1                          |
+| updated_at          | None                                 |
+| user_id             | 0a6895485794400ebd05b0d8b42bbc67     |
++---------------------+--------------------------------------+
+
+Actually creates TWO volumes
+
+$ openstack volume list --all
++--------------------------------------+--------------------------------------------+-----------+------+-------------+
+| ID                                   | Name                                       | Status    | Size | Attached to |
++--------------------------------------+--------------------------------------------+-----------+------+-------------+
+| d429e009-8419-4cca-9d17-63eeae906b73 | image-89730703-1b9f-428c-b18f-d47d61b492eb | available |    1 |             |
+| 7f947cb5-7590-4259-9d0a-d35eb9127460 | myboot                                     | available |    1 |             |
++--------------------------------------+--------------------------------------------+-----------+------+-------------+
+
+The boot volume
+
+2nd volume using image ID in the name; owned by service project.  Non-bootable; read-only
+
+::: {.notes}
+To create a boot volume, use the command openstack volume create as shown here.
+This will create two volumes. You can check the details on those by using the command openstack volume list --all
+In this example the boot volume is myboot. There is a second volume that uses the image ID in the name. It is owned by the service project and is a read only, non-bootable copy of the volume.
+:::
+
+---
+
+Cinder volumes can be extended (resized): made larger, not smaller
+
+Extending volumes
+
+393
+
+$ openstack volume set test-vol –size 2
+
+$ openstack volume list
++--------------------------------------+----------+-----------+------+-------------+
+| ID                                   | Name     | Status    | Size | Attached to |
++--------------------------------------+----------+-----------+------+-------------+
+| e83a8f67-a22d-41de-a2b2-7c4077461be8 | test-vol | available |    2 |             |
+
+![Slide 393 diagram](images/slide_393_image_01.png){width="80%"}
+
+::: {.notes}
+Cinder volumes can be extended or resized. They can only be made larger, not smaller. Use the openstack volume set command to extend a volume.
+While Cinder does not explicitly support shrinking volumes, you can accomplish that by creating a new smaller volume, copying the contents from the larger volume, and deleting the larger volume.
+:::
+
+---
+
+openstack volume delete volume_name
+For Ceph ...
+Deleted volumes are tagged for deletion, but not deleted until a later time
+Defined in /etc/cinder/cinder.conf
+
+enabled_defer_deletion = False | True
+deferred_deletion_delay = 0
+deferred_deletion_purge_interval =  60
+
+RBD (ceph) deferred delete of volumes
+
+394
+
+::: {.notes}
+RBD is a tool that allows you to tag a volume for deletion but to defer that deletion until a later time. RBD stands for RADOS Block Device. The Ceph storage backend supports RBD.
+To invoke this tool, use the command openstack volume delete volume_name. Deleted volumes are tagged for deletion, but not deleted until a later time depending on how the following parameters are defined in cinder.conf.
+The default for enable_deferred_deletion is False. To enable deferred deletion, set this to True. Upon deletion, volumes will be tagged for deletion and will be removed asynchronously at a later time.
+deferred_deletion_delay has a default value of 0. This parameter sets a time delay in seconds before a volume is eligible for permanent removal after being tagged for deferred deletion.
+deferred_deletion_purge_interval has a default of 60. This setting is for the number of seconds between runs of the periodic task to purge volumes tagged for deletion.
+:::
+
+---
+
+Admin role required
+Set volume status to maintenance
+    - openstack volume set --state maintenance test-vol
+Prevents any further actions against the volume
+
+Maintenance mode for volumes
+
+395
+
+::: {.notes}
+An admin role is required to use the maintenance mode for volumes. To set a volume status to maintenance, use the command openstack volume set --state maintenance test-vol. This will prevent any further actions against the volume.
+:::
+
+---
+
+Admin role required
+Volumes between backends supporting the same volume-type
+If the volume is not attached, Cinder creates a new volume and copies the data from the original
+If the volume is attached to an instance, Cinder creates a new volume and calls Nova to copy the data
+libvirt only
+For example:
+    - openstack volume migrate original_volume_ID --host target_cinder_volume_host#target_backend
+During the migration, users might see an error while attempting to delete, attach, or detach the volume
+Migrating volumes with snapshots is not supported
+
+Volume migration
+
+396
+
+::: {.notes}
+An admin role is required for volume migration. This is the process of migrating volumes between backends that support the same volume-type. If the volume is not attached, Cinder will create a new volume and copy the data from the original. If the volume is attached to an instance, Cinder will create a new volume and call Nova to copy the data. This is only available with libvirt.
+An example of a volume migration command is openstack volume migrate original_volume_ID --host target_cinder_volume_host #target_backend
+During the migration, users might see an error while attempting to delete, attach, or detach the volume. Migrating volumes with snapshots is not supported.
+Here is an example of the command to migrate the volume. In  this case we are migrating the cinder volume with ID beginning with  6088.  The current Cinder backend is being changed to the backend defined by the lvmstorage-2 driver in the cinder.conf file. This work is performed on the server2@lvmstorage-2 host.
+openstack volume migrate 6088f80a-f116-4331-ad48-9afb0dfb196c --host server2@lvmstorage-2
+In this command the target_cinder_volume_host is set to server2@lvmstorage-2 and the target_backend is set to  lvmstorage-2
+:::
+
+---
+
+Cinder quotas relate to volume resources:
+gigabytes: amount of volume gigabytes allowed for each project
+snapshots: number of volume snapshots allowed for each project
+volumes: number of volumes allowed for each project
+Quotas are enforced by cinder-api, when processing request
+By default, volume snapshots count against the quotas
+To disable snapshots counting against gigabyte quota; modify /etc/cinder/cinder.conf:
+  - no_snapshot_gb_quota = False
+
+Block storage (cinder) quotas
+
+397
+
+::: {.notes}
+Cinder quotas relate to volume resources. gigabytes are the amount of volume gigabytes allowed for each project. snapshots are the number of volume snapshots allowed for each project. volumes are the number of volumes allowed for each project
+Quotas are enforced by cinder-api, when processing a request. By default, volume snapshots count against the quotas. To disable snapshots counting against gigabyte quota, you need to modify cinder.conf with no_snapshot_gb_quota = False. Default (o domain-level) quotas are commented out in the cinder.conf file.
+In general, you should use the openstack quota command. However, in some cases, you might need to use the cinder quota-* command.
+For more details, see the OpenStack.org config file.
+ https://docs.openstack.org/cinder/ussuri/configuration/block-storage/config-options.html
+:::
+
+---
+
+Display volume resources versus quota for a project
+cinder quota-usage <project-id>
+BUT,
+the cinder command has been deprecated and removed from Caracal.
+There is an alternative, however.
+
+Volume quota example
+
+398
+
+::: {.notes}
+Here is an example of a table showing volume resources versus quota for a project. To display this table, use the cinder quota-usage command. To use this command, you must specify the project ID, not the name. In this example, there is a single 1GB volume in use.
+In this command output we see the gigabytes limit set to 1000. We can see that there is 1 GB of space using the lvmdriver-1 driver, and that there is 1 volume present but the value of the limits on those are set to -1 which means unrestricted.
+:::
+
+---
+
+Combine a couple of openstack commands with some bash shell scripting.
+Format the output of the openstack commands using the commands: jq bc printf
+And your end result could look something like:
+
+Volume quota example
+
+399
+
+cinder-quota-replace.sh $PROJECT_ID
+Volume Quota Usage for Project: fd3194ed47334ec099f4ae5c2103c400
+-------------------------------------------------------------------------
+Resource     Used       Quota
+----------   ---------- ----------
+gigabytes    0          1000
+volumes      2          10
+snapshots    0          10
+
+(The script that created this output is at the end of this slide-deck)
+
+::: {.notes}
+Here is an example of a table showing volume resources versus quota for a project. To display this table, use the cinder quota-usage command. To use this command, you must specify the project ID, not the name. In this example, there is a single 1GB volume in use.
+In this command output we see the gigabytes limit set to 1000. We can see that there is 1 GB of space using the lvmdriver-1 driver, and that there is 1 volume present but the value of the limits on those are set to -1 which means unrestricted.
+:::
+
+---
+
+Comparing openstack storage types
+
+400
+
+::: {.notes}
+Here is a comparison of the types of storage provided by the core OpenStack components. The focus of this lesson has been the Block Storage service known as Cinder. Other OpenStack storage types include Nova, which is for ephemeral storage, and Swift, which is used for object storage.
+:::
+
+---
+
+SUMMARY
+
+::: {.notes}
+Before beginning the lab exercise for this module, let’s review what you’ve learned about Cinder.
+:::
+
+---
+
+You should now be able to:
+Use volumes, snapshots, and backups
+Know where to look for information related to vendor backends
+Describe the Cinder scheduling process
+Define and use a boot volume
+
+Summary
+
+402
+
+::: {.notes}
+You should now be able to use volumes, snapshots, and backups; know where to look for information related to vendor backends; describe the Cinder scheduling process, and define and use a boot volume.
+:::
+
+---
+
+EXERCISES
+
+403
+
+Work through the following lab in the exercise book:
+Lab: Block Storage service (Cinder)
+
+::: {.notes}
+Work through the lab exercise book for the Block Storage service Cinder.
+:::
+
+---
+
+cinder-quota-replace.sh (part 1)
+
+404
+
+#!/bin/bash
+# Check for required argument
+if [ -z "$1" ]; then
+echo "Usage: $0 <project-id>"
+exit 1
+fi
+```bash
+PROJECT_ID=$1
+```
+# Get volume quotas
+```bash
+QUOTAS_JSON=$(openstack quota show "$PROJECT_ID" --volume -f json | jq 'reduce .[] as $item ({}; .[$item.Resource] = $item.Limit)')
+```
+# Parse quota limits
+```bash
+GIGABYTES_QUOTA=$(echo "$QUOTAS_JSON" | jq '.gigabytes')
+```
+VOLUMES_QUOTA=$(echo "$QUOTAS_JSON" | jq '.volumes')
+```bash
+SNAPSHOTS_QUOTA=$(echo "$QUOTAS_JSON" | jq '.snapshots’)
+```
+# Get volumes
+```bash
+VOLUME_LIST=$(openstack volume list --project "$PROJECT_ID" --long -f json)
+```
+USED_VOLUMES=$(echo "$VOLUME_LIST" | jq length)
+```bash
+USED_GB=$(echo "$VOLUME_LIST" | jq '.[].size' | paste -sd+ - | bc 2>/dev/null)
+```
+USED_GB=${USED_GB:-0}
+
+::: {.notes}
+Here is an example of a table showing volume resources versus quota for a project. To display this table, use the cinder quota-usage command. To use this command, you must specify the project ID, not the name. In this example, there is a single 1GB volume in use.
+In this command output we see the gigabytes limit set to 1000. We can see that there is 1 GB of space using the lvmdriver-1 driver, and that there is 1 volume present but the value of the limits on those are set to -1 which means unrestricted.
+:::
+
+---
+
+cinder-quota-replace.sh (part 2)
+
+405
+
+# Get snapshots
+```bash
+SNAPSHOT_LIST=$(openstack volume snapshot list --project "$PROJECT_ID" -f json)
+```
+USED_SNAPSHOTS=$(echo "$SNAPSHOT_LIST" | jq length)
+# Display the results
+printf "\nVolume Quota Usage for Project: %s\n" "$PROJECT_ID"
+echo "-------------------------------------------------------------------------"
+printf "%-12s %-10s %-10s\n" "Resource" "Used" "Quota"
+printf "%-12s %-10s %-10s\n" "----------" "----------" "----------"
+printf "%-12s %-10d %-10d\n" "gigabytes" "$USED_GB" "$GIGABYTES_QUOTA"
+printf "%-12s %-10d %-10d\n" "volumes"   "$USED_VOLUMES" "$VOLUMES_QUOTA"
+printf "%-12s %-10d %-10d\n" "snapshots" "$USED_SNAPSHOTS" "$SNAPSHOTS_QUOTA"
+
+::: {.notes}
+Here is an example of a table showing volume resources versus quota for a project. To display this table, use the cinder quota-usage command. To use this command, you must specify the project ID, not the name. In this example, there is a single 1GB volume in use.
+In this command output we see the gigabytes limit set to 1000. We can see that there is 1 GB of space using the lvmdriver-1 driver, and that there is 1 volume present but the value of the limits on those are set to -1 which means unrestricted.
+:::
+
+---
+
