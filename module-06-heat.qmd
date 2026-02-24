@@ -45,7 +45,6 @@ footer: © Mirantis Training - OS220 - OpenStack Administration"
 In this lecture, you will learn about Heat and how to create Heat templates.
 :::
 
----
 
 At the end of this presentation, you should be able to:
 Explain the most commonly used sections of a Heat template
@@ -61,7 +60,6 @@ Objectives
 At the end of this presentation, you should understand the most commonly used sections of a Heat template, how to define input parameters including constraints, how to create or update a Heat template, how to check the syntax of your Heat template, and where to look for help.
 :::
 
----
 
 # Orchestration Service (Heat) {.center}
 
@@ -77,7 +75,6 @@ At the end of this presentation, you should understand the most commonly used se
 - This enables OpenStack core projects to satisfy the requirements for a larger user base as compared with the core components.
 :::
 
----
 
 Orchestration vs. Configuration management
 
@@ -100,7 +97,6 @@ Heat is used to deploy VMs and OpenStack resources such as instances, networks, 
 To invoke configuration management tools from Heat, use cloud-init on the VMs and user_data in a Heat template. Chef, Puppet, Ansible, Vagrant, and SaltStack are examples of configuration management products.
 :::
 
----
 
 Describes the infrastructure for a cloud application – known as a stack when deployed:
 OpenStack resources: instances, networks, volumes, security groups, load balancers, software, and more! Relationships between resources: for example, this volume is connected to this server
@@ -129,7 +125,6 @@ Companies typically deploy OpenStack to run applications in the cloud. Some of t
 Heat integrates with software configuration management tools such as Puppet, Chef, Ansible, and so on. For example you could create a VM with a puppet server and install puppet clients on VMs. Heat can also pass parameters. Heat also integrates with Ceilometer, Aodh, and Gnocchi for autoscaling of resources.
 :::
 
----
 
 # Heat Architecture {.center}
 
@@ -148,7 +143,6 @@ This is a diagram of Heat’s architecture. The Orchestration service consists o
 - Autoscaling allows Heat to provision additional resources to meet demand and remove them later when those resources are no longer required.
 :::
 
----
 
 # Heat Orchestration Template (Hot) {.center}
 
@@ -161,7 +155,6 @@ In this next section, we will introduce the syntax of Heat orchestration templat
 But first, let’s discuss the basics of a Heat template.
 :::
 
----
 
 heat_template_version: indicates the version of Heat description: (optional) Describes the template or the workload that can be deployed using the template. parameter_groups: (optional) Specifies how the input parameters should be grouped and the order to provide the parameters in.
 parameters: (optional) Defined input parameters that must to be provided when instantiating the template.
@@ -195,7 +188,6 @@ Here are the key components and syntax of a Heat Orchestration Template, also kn
 conditions is also optional. It includes statements which can be used to restrict when a resource is created or when a property is defined. They can be associated with resources and resource properties in the resources section. Conditions can also be associated with outputs in the outputs sections of a template.
 :::
 
----
 
 heat_template_version: indicates the version of the HOT template:
 description (optional): text that describes the template: how many servers, what type of servers, and so on
@@ -227,7 +219,6 @@ The description can span more than 1 line.
 Although the description section is optional, it can provide some very useful information about the template.
 :::
 
----
 
 parameters section (optional): defines input parameters, if any, from the user of the template:
 name of Heat stack name of virtual server(s) what image to use
@@ -252,7 +243,6 @@ Possible input parameters include the name of Heat stack, the name of the virtua
 A quick word regarding indentation on the YAML file. The required indentation is two blank spaces for each indentation. Heat templates are very sensitive to this requirement. For example, you might have every resource, property, and so on, defined correctly HOWEVER if even one line is off by a single blank space with regards to the indentation, the Heat template will be flagged with an error.
 :::
 
----
 
 resources section: defines the resources to be created or used
 OpenStack resource types, such as:
@@ -288,7 +278,6 @@ The syntax for declaring these resources is shown here.
 https://docs.openstack.org/heat/latest/template_guide/openstack.html
 :::
 
----
 
 outputs section (optional): Allows you to set and store output attributes, such as the IP address of an instance
 This section is optional and can be omitted when no output values are required
@@ -307,7 +296,6 @@ The outputs section is also optional. It allows you to set and store output attr
 To retrieve the stack output from the CLI, use the command openstack stack output show --all stack_name Refer to the resource type specification for a list of attributes.
 :::
 
----
 
 Example 1: simple hot to deploy 1 instance
 
@@ -320,7 +308,6 @@ Here is a very straightforward example of a Heat template that can deploy a sing
 To create the Heat stack and deploy the instance from the CLI, you would use the openstack stack create command.
 :::
 
----
 
 To deploy from the CLI:
 After the stack is created:
@@ -348,7 +335,6 @@ Here you can see how to use the CLI to deploy a Heat stack. For example, you cou
 Note that the stack name, BASIC in this case, does not need to be upper case. The author chose to use all uppercase characters to simplify debugging.
 :::
 
----
 
 EXAMPLE 2: HOT using parameters & outputs
 
@@ -369,7 +355,6 @@ ussuri-1.5 © 2021 Mirantis, Inc.
 Also shown is an example of extracting the IP address and instance name of the deployed instance and storing it in the stack output.
 :::
 
----
 
 To deploy from the CLI:
 After the stack is created:
@@ -397,7 +382,6 @@ Here is another example of using parameters and outputs in a Heat template. This
 The openstack stack output show command displays the outputs defined in the Heat template along with their instantiated values for the deployed Heat stack.  openstack stack output show PARMS --all provides more detailed information about the instance_name and instance_ip. In this example, you can see that the instance_name is heatVM, which is the default, and the instance_IP is 10.0.0.11.
 :::
 
----
 
 Start here
 docs.openstack.org/heat/latest/#hot-spec
@@ -430,7 +414,6 @@ https://git.openstack.org/cgit/openstack/heat-templates/tree/hot/hello_world.yam
 https://github.com/openstack/heat-templates/tree/master/hot
 :::
 
----
 
 # Heat Template Resource Type Guide {.center}
 
@@ -443,7 +426,6 @@ USING PROPERTIES FOR PARAMETERS
 This next section covers parameters and outputs for Heat template resources.
 :::
 
----
 
 Each Heat resource has a list of properties that can be specified as a Heat template parameter
 Use get_param function to retrieve Examples for OS::Nova::Server
@@ -479,7 +461,6 @@ When developing a Heat template, how do you know what the input parameters might
     https://docs.openstack.org/heat/ussuri/template_guide/index.html
 :::
 
----
 
 Each Heat resource has a list of attributes that can be specified as a Heat template output
 Use get_attr function to retrieve Examples for OS::Nova::Server:
@@ -513,7 +494,6 @@ When developing a Heat template, how do you know what the possible outputs might
 From the command line, issue: openstack orchestration resource type list
 :::
 
----
 
 # Heat Orchestration Template (Hot) {.center}
 
@@ -523,7 +503,6 @@ When developing a Heat template, how do you know what the possible outputs might
 This next section will address parameter constraints within a Heat Orchestration Template or HOT.
 :::
 
----
 
 constraints are optional
 A list of constraints to apply against a parameter.
@@ -542,7 +521,6 @@ When using parameter constraints, note that constraints are optional. You may in
 There are two types of constraints - user defined and custom.
 :::
 
----
 
 Specify restrictions on length and/or a pattern
 
@@ -563,7 +541,6 @@ Parameter constraints: length & allowed pattern
 - The remaining 5 to 7 characters can be any combination of upper or lower case letters A through Z or any number 0 through 9.
 :::
 
----
 
 Specify restrictions on a parameter value
 
@@ -583,7 +560,6 @@ Here is another example of a user defined constraint. In this example, the user 
 The error message text comes from the description specified on the constraint.
 :::
 
----
 
 Specify restrictions on parameter value range
 
@@ -605,7 +581,6 @@ Parameter constraints – range of values
 - In both the Dashboard UI and command line, the user will see an error if an invalid port is specified.
 :::
 
----
 
 Custom constraints are implemented by plugins; providing advanced constraint validation logic
 Creates a list of all resources of the specified type, owned by the user’s project
@@ -636,7 +611,6 @@ Custom constraints
 https://docs.openstack.org/heat/latest/template_guide/hot_spec.html#parameters-section
 :::
 
----
 
 User defined constraints: flavor_type: uses allowed_values
 Custom constraints: image_name: glance.image
@@ -658,7 +632,6 @@ Our third example shows several parameter constraints in action.The flavor_typ
 Next you will see this same example in the UI.
 :::
 
----
 
 Provides an easy way to access all resources, such as, images, networks, etc.
 Without having to maintain the Heat template as new resources are created
@@ -681,7 +654,6 @@ The UI provides an easy way to access all resources, such as images, networks, e
 Using labels for parameters allows you to be more descriptive on the UI.
 :::
 
----
 
 # Heat Orchestration Template (Hot) {.center}
 
@@ -707,7 +679,6 @@ SOME PRACTICAL, EVERY DAY USE CASE, EXAMPLES
 This next section will cover some practical, everyday use examples of the Heat Orchestration Template or HOT.
 :::
 
----
 
 4: Deploy multiple instances where 1 depends on the successful deployment of another
 5: Deploy an instance with security group and rules
@@ -725,7 +696,6 @@ You will see four everyday use examples in this section:
 And 7 is a deployment of an instance that creates a Cinder volume and attaches it to the instance.
 :::
 
----
 
 parameters:
 db_flavor:
@@ -761,7 +731,6 @@ Instance 1 is a database server, and several flavors are allowed, with m1.small 
 OS::Heat::WaitConditionHandle is a resource to signal condition completion. You can signal success by adding --data-binary '{"status": "SUCCESS"}' , or signal failure by adding --data-binary '{"status": "FAILURE"}
 :::
 
----
 
 resources: my_server:
 
@@ -788,7 +757,6 @@ Example 5 shows how to create a virtual machine with security group rules. In th
 This example shows how rules are applied from an existing security group to a VM instance as it is deployed. In this case, our_std_SGrules allows ping requests (via all ICMP) and SSH requests (via TCP requests on port 22).
 :::
 
----
 
 Associate floating IP to instance
 OS::Neutron::FloatingIPAssociation Uses get_resource for ID of floating IP Uses get_attr for ID of port on instance
@@ -815,7 +783,6 @@ Quite frequently, when you deploy an instance, you want to SSH into it.
 OS::Neutron::FloatingIP is used to create new floating IP on the public network.
 :::
 
----
 
 Deploy instance OS::Nova::Server
 Create volume OS::Cinder::Volume Default size of 1 GB
@@ -846,7 +813,6 @@ Example 7 shows how you can use Heat to automate the deployment of a virtual mac
 The OS::Cinder::VolumeAttachment resource needs the ID of the instance as well as the ID of the volume. The get_resource function retrieves each ID.
 :::
 
----
 
 # Customizing Vm Instances {.center}
 
@@ -858,7 +824,6 @@ This next section will cover how to customize VM instances when installing softw
 Customizing VM instances requires cloud-init is installed in the image being used.
 :::
 
----
 
 An open-source package from Ubuntu that is the industry standard for bootstrapping cloud servers (initialization on first boot)
 Available on various Linux distributions such as Ubuntu Cloud images and the official Ubuntu images available on EC2
@@ -896,7 +861,6 @@ Defining SSH keys
 http://cloudinit.readthedocs.org/en/latest/topics/examples.html
 :::
 
----
 
 Heat template to deploy a VM
 user_data; at initial boot: Get copy of myscript.sh Make it executable
@@ -914,7 +878,6 @@ Example 8 shows how you can deploy a VM and run a simple user script in a Heat t
 In this example, the myscript.sh script is downloaded to the virtual machine using the wget command, made into an executable file via the chmod +x command, and executed.
 :::
 
----
 
 Automate the installation and configuration of Apache for:
 Debian/Ubuntu (apt-get) CentOS/Fedora (yum)
@@ -933,7 +896,6 @@ Example 9: deploy vm with apache
 This example is a subset of a 3-tier Web Application using WordPress/LAMP. This example shows the install of Apache2 as part of a LAMP stack. LAMP stands for Linux, Apache, MySQL, and PHP/Python/Perl.
 :::
 
----
 
 For a VM instance (OS::Nova::Server) use str_replace to:
 Echo a message at initial boot “Hi vm_name”
@@ -965,7 +927,6 @@ See the provided link for additional OpenStack documentation.
     https://docs.openstack.org/heat/latest/template_guide/hot_spec.html#str-replace
 :::
 
----
 
 For a VM instance (OS::Nova::Server) use str_replace to
 Substitute the VM (host) IP address (first_address) in the URL to access the application
@@ -984,7 +945,6 @@ Example 11 is a more realistic example of str_replace.
 str_replace retrieves the IP address of the instance (the host param) and substitutes it into the URL (template), storing it in the stack output. For example, http://10.0.0.8/MyApplication could be the result of this mapping.
 :::
 
----
 
 OS::Heat::CloudConfig
 Heat resource that can be used instead of coding scripts/commands to run for cloud-init
@@ -1021,7 +981,6 @@ Here is a breakdown of what these Heat Software Deployment resources do:
    http://docs.openstack.org/developer/heat/template_guide/software_deployment.html
 :::
 
----
 
 # Validating Heat Templates {.center}
 
@@ -1030,7 +989,6 @@ When creating Heat templates, you  are bound to make errors.
 In this lesson, we’ll go over how you can validate your Heat templates to find and fix errors.
 :::
 
----
 
 During development of a Heat template, you should validate the syntax From the CLI, use the --dry-run parameter
 openstack stack create --template template_name.yaml  stack_name –dry-run
@@ -1053,7 +1011,6 @@ openstack stack create --template template_name.yaml stack_name --dry-run
     http://www.yamllint.com/
 :::
 
----
 
 Invalid template version
 ERROR: The template version is invalid: "heat_template_version: 20103-05-23". "heat_template_version" should be one of:
@@ -1080,7 +1037,6 @@ Here are some common errors.
 The “Block syntax/parsing error (indentation error)” indicates an error at line 11, column 24. The actual error is most likely on the preceding line - line 10.
 :::
 
----
 
 Missing required property
 ERROR: Property error: : resources.nova_instance.properties: : Property flavor not assigned
@@ -1104,11 +1060,9 @@ Here are three more common template errors.
 “Invalid parameter name” occurred because the parameter name is specified as VM_name with uppercase letters, but it is referenced as vm_name with lowercase letter  in the OS::Nova::Server resource.
 :::
 
----
 
 SUMMARY
 
----
 
 You should now be able to:
 Explain the most commonly used sections of a Heat template
@@ -1130,7 +1084,6 @@ At this point, you should be able to:
     Understand where to look for help
 :::
 
----
 
 EXERCISES
 
@@ -1145,5 +1098,4 @@ Lab: Orchestration service (Heat)
 You are now ready to begin Lab 7: Orchestration Service: Heat. Work through the lab by carefully following each step. You are encouraged to look back to the presentations in this module and earlier modules to refresh your memory and reinforce the concepts. Good luck with Lab 7.
 :::
 
----
 
