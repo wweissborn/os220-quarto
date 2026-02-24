@@ -63,7 +63,6 @@ At the end of this lesson, you should be able to:
     https://docs.openstack.org/python-octaviaclient/ussuri/cli/index.html
 :::
 
----
 
 # Octavia Lbaas V2 {.center}
 
@@ -73,7 +72,6 @@ At the end of this lesson, you should be able to:
 This next section gives an overview of Octavia Load Balancer as a Service version 2.
 :::
 
----
 
 Application delivery, scaling, and availability are considered vital features of any cloud Load balancing is essential for enabling the applications
 Octavia provides a reference implementation of OpenStack LBaaS v2
@@ -93,7 +91,6 @@ Octavia is an open source, operator-scale load balancing solution designed to wo
     https://docs.openstack.org/octavia/ussuri/reference/introduction.html
 :::
 
----
 
 Octavia architecture
 
@@ -109,7 +106,6 @@ This diagram provides a visual overview of how the Octavia components interact w
     https://docs.openstack.org/octavia/ussuri/reference/introduction.html
 :::
 
----
 
 Uses amphorae running HAProxy to provide load balancing
 Consists of several sub-components (daemons):
@@ -140,7 +136,6 @@ To review what is on the diagram, the controller API daemon must have access to 
     https://docs.openstack.org/octavia/ussuri/admin/providers/index.html
 :::
 
----
 
 Implemented as virtual machines, containers, or bare metal servers
 Defined in octavia.conf config file
@@ -174,7 +169,6 @@ Each amphora is implemented as a virtual machine instance. It can also be a cont
 There should only be one image per Octavia installation
 :::
 
----
 
 Reference implementation: Ubuntu 18.04 LTS (bionic) with HAProxy
 Use diskimage-create.sh utility to create the image
@@ -211,7 +205,6 @@ Here is key information needed to build an amphorae image.
     https://docs.openstack.org/octavia/ussuri/admin/amphora-image-build.html
 :::
 
----
 
 [controller_worker]
 
@@ -266,7 +259,6 @@ Here you can see a partial example of the octavia.conf file for LBaaS. Some thin
 The lb-mgmt-sec-grp security group is the image beginning with bc225. It allows ingress communication for ICMP, SSH, and port 9442.
 :::
 
----
 
 CLI: creating LBAAS topology
 
@@ -291,7 +283,6 @@ Here you can see the steps for creating a load balancer to two front-end HTTP (w
 - This is typically implemented using a Heat template to create the load balancer resources, as well as the autoscaling resources.
 :::
 
----
 
 UI: private network port list
 
@@ -305,7 +296,6 @@ Here we can see the Private Network Port List as shown on the UI. Highlights and
 - For the load balancer in Octavia, the two allocated ports will have a name that starts with “octavia-lb…” The load balancer VIP can be identified by its attached device which will be “Octavia,” while the amphora instance will be attached to compute:nova.
 :::
 
----
 
 Using the lbaas example:
 3 networks:
@@ -332,7 +322,6 @@ This image was merged from two different topology screens from the Dashboard UI.
 Again, on the UI, this information will span two different topology diagrams.
 :::
 
----
 
 Amphora instance details
 
@@ -344,7 +333,6 @@ Here we see an example of a normal openstack server list command for the amphora
 This information can be obtained by issuing the command openstack server show <amphora ID>.
 :::
 
----
 
 Managing the amphora
 
@@ -358,7 +346,6 @@ loadbalancer amphora list. You see the load balancer ID and VIP address when you
 Notice the amphora ID highlighted in yellow. The ID is used as part of the amphora instance name. In this case that would be amphora-0f863e07…
 :::
 
----
 
 Managing the amphora
 
@@ -377,7 +364,6 @@ image_id, which is the ID of the amphora image, amphora-x64-haproxy; and
 compute_flavor, which is the ID of the flavor used, m1.amphora, to create the amphora.
 :::
 
----
 
 Display statistics
 
@@ -390,7 +376,6 @@ To display statistics for a selected amphora, use the command openstack loadbala
 openstack loadbalancer stats show <load_balancer>
 :::
 
----
 
 openstack loadbalancer status show lbaas
 
@@ -405,7 +390,6 @@ To display load balancer details, use the command openstack loadbalancer amphora
 You see the load balancer ID and VIP address when you list the amphora.
 :::
 
----
 
 # Additional Topics {.center}
 
@@ -413,7 +397,6 @@ To display load balancer details, use the command openstack loadbalancer amphora
 In this next section, we’ll look at additional topics related to Octavia and load balancers not previously covered in the Octavia lesson.
 :::
 
----
 
 Octavia supports the following load balancing protocols, defined for the listener resource:
 TCP HTTP HTTPS
@@ -433,7 +416,6 @@ Octavia supports the following load balancing protocols, defined for the listene
 SOURCE_IP requests are distributed to backend servers based on the source IP address. That is to say, requests from unique source IP addresses are consistently directed to the same instance.
 :::
 
----
 
 Octavia requires several ports to be open Several security groups are used/created:
 lb-mgmt-sec-grp, applied to the amphora instances, with rules for: Ingress ICMP
@@ -456,7 +438,6 @@ Octavia requires several ports to be open, and there are several security groups
 The lb-<load_balancer_ID> is created for each load balancer. It is applied to the VIP port on the load balancer, with rules for the load balancer protocol for ingress HTTP on port 80 and ingress on port 1025.
 :::
 
----
 
 Additional features
 
@@ -473,7 +454,6 @@ Elastic load balancing is the main attraction of Octavia, and is also what enabl
 Furthermore, because the workload is handled by VMs, it can provide high availability features via active/standby amphorae instances. Elastic load balancing supports additional layer 7 (or L7) policies and rules. For example, any client request that matches the L7 rule “request URI starts with ‘/api’ ” - should be routed to the “api” pool.
 :::
 
----
 
 # L7 Content Switching {.center}
 
@@ -491,7 +471,6 @@ Send the request to a particular member
     https://docs.openstack.org/octavia/latest/user/guides/l7.html
 :::
 
----
 
 Display default load balancing quotas:
 
@@ -554,7 +533,6 @@ Here you can see how to access information about load balancing quotas. By defau
 Use the openstack loadbalancer quota set command to quotas. These will define overrides for your project. To display quotas for your project, use the command openstack loadbalancer quota list.
 :::
 
----
 
 Independent of Neutron: Octavia API now serviced as WSGI through Apache
 public endpoint in service catalog
@@ -584,7 +562,6 @@ This slide provides an overview of some key updates/changes to Octavia since the
 Finally, releases after Rocky support boot volume for the amphora disk image.
 :::
 
----
 
 Display list of available Octavia providers:
 openstack loadbalancer provider list
@@ -641,7 +618,6 @@ Here we see how to access information about the load balancing providers and the
 To display a list of available Octavia providers, use the command openstack loadbalancer provider list. This example shows that the providers are amphora and octavia.To display the provider capabilities, use the command openstack loadbalancer provider capability list amphora. The capabilities are defined as metadata on a flavor or availability zone.
 :::
 
----
 
 Octavia roles (reference)
 
@@ -652,7 +628,6 @@ These are the roles available for Octavia. Users must have one of the above role
 In general, the user must have the admin role to create and manage LBaaS resources. The other roles are used to limit access while still allowing necessary commands.
 :::
 
----
 
 SUMMARY
 
@@ -660,7 +635,6 @@ SUMMARY
 We will now wrap up our lessons on Octavia.
 :::
 
----
 
 You should now be able to:
 Describe the Octavia architecture
@@ -677,7 +651,6 @@ You should now be able to:
     Use the CLI to implement a load balancer solution
 :::
 
----
 
 EXERCISES
 
@@ -692,5 +665,4 @@ Lab: Load Balancer as a Service (Octavia)
 You are now ready to begin Lab 8: Load Balancer as a Service (Octavia). Work through the lab by carefully following each step. You are encouraged to look back to the presentations in this module and earlier modules to refresh your memory and reinforce the concepts. Good luck!
 :::
 
----
 
